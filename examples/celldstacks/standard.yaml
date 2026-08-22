@@ -1,0 +1,18 @@
+apiVersion: hops.ops.com.ai/v1alpha1
+kind: CelldStack
+metadata:
+  name: celld
+  namespace: default
+spec:
+  clusterName: production-cluster
+  namespace: celld
+  replicaCount: 2
+  bucket: s3://my-cells-bucket
+  region: us-east-2
+  credentials:
+    existingSecret: celld-aws
+  persistence:
+    enabled: true
+    size: 20Gi
+  labels:
+    team: platform

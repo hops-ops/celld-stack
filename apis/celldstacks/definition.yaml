@@ -1,0 +1,179 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: celldstacks.hops.ops.com.ai
+spec:
+  group: hops.ops.com.ai
+  names:
+    kind: CelldStack
+    plural: celldstacks
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    referenceable: true
+    served: true
+    schema:
+      openAPIV3Schema:
+        description: CelldStack installs celld (self-hosted Durable Objects) onto a target Kubernetes cluster as a Helm release. Fleet nodes coordinate through an object-storage bucket the user owns.
+        type: object
+        properties:
+          spec:
+            description: CelldStackSpec defines the desired state.
+            type: object
+            properties:
+              clusterName:
+                description: Name of the target cluster. Used as default for Helm and Kubernetes ProviderConfig names.
+                type: string
+              managementPolicies:
+                description: Management policies for all composed resources. Defaults to ["*"].
+                type: array
+                items:
+                  type: string
+                default:
+                - "*"
+              labels:
+                description: Custom labels applied to all managed resources.
+                type: object
+                additionalProperties:
+                  type: string
+                x-kubernetes-preserve-unknown-fields: true
+              providerConfigRefs:
+                description: ProviderConfig references for composed Helm and Kubernetes resources. Each defaults to clusterName.
+                type: object
+                properties:
+                  helm:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      kind:
+                        type: string
+                        enum:
+                        - ProviderConfig
+                        - ClusterProviderConfig
+                  kubernetes:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      kind:
+                        type: string
+                        enum:
+                        - ProviderConfig
+                        - ClusterProviderConfig
+              helmProviderConfigRef:
+                description: Reference to the Helm ProviderConfig. Defaults to clusterName. Prefer providerConfigRefs.helm.
+                type: object
+                properties:
+                  name:
+                    type: string
+                  kind:
+                    type: string
+                    enum:
+                    - ProviderConfig
+                    - ClusterProviderConfig
+              namespace:
+                description: Namespace for the celld Helm release. Defaults to "celld".
+                type: string
+              releaseName:
+                description: Helm release name. Defaults to metadata.name.
+                type: string
+              chartVersion:
+                description: celld chart version. Defaults to "0.1.0".
+                type: string
+              chartRepository:
+                description: Helm chart repository. Defaults to https://hops-ops.github.io/celld-chart.
+                type: string
+              chartUrl:
+                description: Optional direct URL to a packaged chart tarball. When set, used instead of chartRepository.
+                type: string
+              replicaCount:
+                description: Number of celld fleet nodes. Defaults to 1.
+                type: integer
+                minimum: 1
+              bucket:
+                description: Fleet bucket (s3://, gs://, or az://), optionally with a key prefix.
+                type: string
+              endpoint:
+                description: S3-compatible endpoint (for example Cloudflare R2). Leave empty for AWS S3.
+                type: string
+              region:
+                description: Object-storage region. Defaults to us-east-2. Ignored for gs:// and az:// buckets.
+                type: string
+              credentials:
+                description: Bucket credentials projected into the celld pod.
+                type: object
+                properties:
+                  existingSecret:
+                    description: Name of a Secret in the celld namespace with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (and optional AWS_SESSION_TOKEN).
+                    type: string
+              image:
+                description: celld image settings passed to the chart.
+                type: object
+                properties:
+                  repository:
+                    type: string
+                    default: ghcr.io/denoland/celld
+                  tag:
+                    type: string
+                    default: v0.3.0
+                  pullPolicy:
+                    type: string
+                    enum:
+                    - Always
+                    - IfNotPresent
+                    - Never
+                    default: IfNotPresent
+              persistence:
+                description: Persistent volume for CELLD_WATCH local state.
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: true
+                  size:
+                    type: string
+                    default: 10Gi
+                  storageClassName:
+                    type: string
+                  existingClaim:
+                    type: string
+              values:
+                description: Helm values merged on top of chart defaults.
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              overrideAllValues:
+                description: Helm values that replace all defaults entirely.
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+            required:
+            - clusterName
+          status:
+            description: CelldStackStatus defines the observed state.
+            type: object
+            properties:
+              ready:
+                description: Whether the namespace, Helm release, and deletion Usage are ready.
+                type: boolean
+              release:
+                description: Observed Helm release.
+                type: object
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  ready:
+                    type: boolean
+              service:
+                description: Observed public Service for Worker HTTP.
+                type: object
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  port:
+                    type: integer
+        required:
+        - spec

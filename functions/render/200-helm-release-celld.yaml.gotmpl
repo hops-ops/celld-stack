@@ -1,0 +1,77 @@
+# code: language=yaml
+#
+# Helm Release: celld.
+#
+# Chart: https://hops-ops.github.io/celld-chart (chart name: celld)
+# Upstream runtime: https://github.com/denoland/celld
+
+{{- $chartDefaults := dict
+  "fullnameOverride" $state.serviceName
+  "replicaCount" $state.replicaCount
+  "image" $state.image
+  "celld" (dict
+    "bucket" $state.bucket
+    "endpoint" $state.endpoint
+    "region" $state.region
+  )
+  "credentials" $state.credentials
+  "persistence" $state.persistence
+}}
+
+---
+apiVersion: helm.m.crossplane.io/v1beta1
+kind: Release
+metadata:
+  name: {{ $state.releaseName }}
+  annotations:
+    {{ setResourceNameAnnotation "helm-release-celld" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    chart:
+      name: celld
+      {{- if $state.chartUrl }}
+      url: {{ $state.chartUrl | quote }}
+      {{- else if and $state.chartRepository (ne $state.chartRepository "https://hops-ops.github.io/celld-chart") }}
+      repository: {{ $state.chartRepository | quote }}
+      {{- else }}
+      repository: https://hops-ops.github.io/celld-chart
+      {{- end }}
+      version: {{ $state.chartVersion | quote }}
+    namespace: {{ $state.namespace }}
+    {{- if $state.overrideAllValues }}
+    values:
+      {{- toYaml $state.overrideAllValues | nindent 6 }}
+    {{- else }}
+    {{- $merged := mergeOverwrite $chartDefaults $state.values }}
+    values:
+      {{- toYaml $merged | nindent 6 }}
+    {{- end }}
+  rollbackLimit: 3
+  providerConfigRef:
+    name: {{ $state.helmProviderConfigRef.name }}
+    kind: {{ $state.helmProviderConfigRef.kind }}
+
+{{- if and $state.observed.namespace.ready $state.observed.release.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-helm-celld-before-namespace
+  annotations:
+    {{ setResourceNameAnnotation "usage-celld-namespace" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: kubernetes.m.crossplane.io/v1alpha1
+    kind: Object
+    resourceRef:
+      name: {{ $state.name }}-namespace
+  by:
+    apiVersion: helm.m.crossplane.io/v1beta1
+    kind: Release
+    resourceRef:
+      name: {{ $state.releaseName }}
+{{- end }}
