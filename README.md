@@ -57,7 +57,7 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 | `clusterName` | string | _required_ | Target cluster name; default for ProviderConfig names |
 | `namespace` | string | `celld` | Namespace for the Helm release |
 | `releaseName` | string | metadata.name | Helm release name |
-| `chartVersion` | string | `0.3.0` | celld Helm chart version |
+| `chartVersion` | string | `0.3.1` | celld Helm chart version |
 | `chartUrl` | string | — | Optional packaged-chart URL (skips the Helm repo) |
 | `replicaCount` | integer | `1` | Fleet nodes |
 | `bucket` | string | — | `s3://`, `gs://`, or `az://` bucket |

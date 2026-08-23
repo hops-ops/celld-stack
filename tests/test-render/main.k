@@ -41,7 +41,7 @@ _items = [
                         chart = {
                             name = "celld"
                             repository = "https://hops-ops.github.io/celld-chart"
-                            version = "0.3.0"
+                            version = "0.3.1"
                         }
                         namespace = "celld"
                     }
