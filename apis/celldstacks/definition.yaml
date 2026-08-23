@@ -79,7 +79,7 @@ spec:
                 description: Helm release name. Defaults to metadata.name.
                 type: string
               chartVersion:
-                description: celld chart version. Defaults to "0.2.1".
+                description: celld chart version. Defaults to "0.2.2".
                 type: string
               chartRepository:
                 description: Helm chart repository. Defaults to https://hops-ops.github.io/celld-chart.
