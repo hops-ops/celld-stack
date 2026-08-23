@@ -41,6 +41,7 @@ spec:
       {{- end }}
       version: {{ $state.chartVersion | quote }}
     namespace: {{ $state.namespace }}
+    wait: false
     {{- if $state.overrideAllValues }}
     values:
       {{- toYaml $state.overrideAllValues | nindent 6 }}
