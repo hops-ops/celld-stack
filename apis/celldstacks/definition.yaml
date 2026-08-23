@@ -79,7 +79,7 @@ spec:
                 description: Helm release name. Defaults to metadata.name.
                 type: string
               chartVersion:
-                description: celld chart version. Defaults to "0.1.0".
+                description: celld chart version. Defaults to "0.2.0".
                 type: string
               chartRepository:
                 description: Helm chart repository. Defaults to https://hops-ops.github.io/celld-chart.
@@ -107,6 +107,30 @@ spec:
                   existingSecret:
                     description: Name of a Secret in the celld namespace with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (and optional AWS_SESSION_TOKEN).
                     type: string
+              azurite:
+                description: Deploy in-cluster Azurite and point celld at it. Local/dev only — not a production fleet store.
+                type: object
+                properties:
+                  enabled:
+                    description: When true, the chart runs Azurite, creates the blob container, and configures celld for the Azure emulator (az://).
+                    type: boolean
+                    default: false
+                  container:
+                    description: Azure blob container name used as az://<container>. Defaults to "celld".
+                    type: string
+                    default: celld
+                  persistence:
+                    description: Persistent volume for Azurite blob data.
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        default: true
+                      size:
+                        type: string
+                        default: 2Gi
+                      storageClassName:
+                        type: string
               image:
                 description: celld image settings passed to the chart.
                 type: object

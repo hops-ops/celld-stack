@@ -41,7 +41,7 @@ _items = [
                         chart = {
                             name = "celld"
                             repository = "https://hops-ops.github.io/celld-chart"
-                            version = "0.1.0"
+                            version = "0.2.0"
                         }
                         namespace = "celld"
                     }
@@ -99,7 +99,7 @@ _items = [
                 metadata.name = "version-test"
                 spec = {
                     clusterName = "my-cluster"
-                    chartVersion = "0.2.0"
+                    chartVersion = "0.3.0"
                 }
             }
             assertResources = [
@@ -107,7 +107,7 @@ _items = [
                     apiVersion = "helm.m.crossplane.io/v1beta1"
                     kind = "Release"
                     metadata.name = "version-test"
-                    spec.forProvider.chart.version = "0.2.0"
+                    spec.forProvider.chart.version = "0.3.0"
                 }
             ]
         }
@@ -270,6 +270,37 @@ _items = [
                     kind = "Release"
                     metadata.name = "url-test"
                     spec.forProvider.chart.url = "https://example.invalid/celld-0.1.0.tgz"
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 9: azurite.enabled deploys Azurite and points celld at az://celld.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "azurite-enabled-configures-emulator"
+        spec = {
+            compositionPath = "apis/celldstacks/composition.yaml"
+            xrdPath = "apis/celldstacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.CelldStack {
+                metadata.name = "azurite-test"
+                spec = {
+                    clusterName = "my-cluster"
+                    azurite = {enabled = True}
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "azurite-test"
+                    spec.forProvider.values = {
+                        celld = {bucket = "az://celld"}
+                        azurite = {enabled = True, container = "celld"}
+                    }
                 }
             ]
         }

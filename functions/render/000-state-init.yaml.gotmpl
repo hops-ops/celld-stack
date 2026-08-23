@@ -10,7 +10,7 @@
 {{- $clusterName := $spec.clusterName | default $name }}
 {{- $namespace := $spec.namespace | default "celld" }}
 {{- $releaseName := $spec.releaseName | default $name }}
-{{- $chartVersion := $spec.chartVersion | default "0.1.0" }}
+{{- $chartVersion := $spec.chartVersion | default "0.2.0" }}
 {{- $chartRepository := $spec.chartRepository | default "https://hops-ops.github.io/celld-chart" }}
 {{- $chartUrl := $spec.chartUrl | default "" }}
 {{- $replicaCount := $spec.replicaCount | default 1 }}
@@ -39,6 +39,17 @@
 {{- $image := $spec.image | default dict }}
 {{- $persistence := $spec.persistence | default dict }}
 {{- $credentials := $spec.credentials | default dict }}
+{{- $azurite := $spec.azurite | default dict }}
+{{- $azuriteEnabled := false }}
+{{- if hasKey $azurite "enabled" }}{{- $azuriteEnabled = $azurite.enabled }}{{- end }}
+{{- $azuriteContainer := $azurite.container | default "celld" }}
+{{- $azuritePersistence := $azurite.persistence | default dict }}
+{{- $azuritePersistenceEnabled := true }}
+{{- if hasKey $azuritePersistence "enabled" }}{{- $azuritePersistenceEnabled = $azuritePersistence.enabled }}{{- end }}
+{{- $bucket := $spec.bucket | default "" }}
+{{- if $azuriteEnabled }}
+  {{- $bucket = printf "az://%s" $azuriteContainer }}
+{{- end }}
 {{- $persistenceEnabled := true }}
 {{- if hasKey $persistence "enabled" }}{{- $persistenceEnabled = $persistence.enabled }}{{- end }}
 
@@ -61,11 +72,20 @@
   "helmProviderConfigRef" $helmProviderConfigRef
   "kubernetesProviderConfigRef" $kubernetesProviderConfigRef
   "serviceName" $serviceName
-  "bucket" ($spec.bucket | default "")
+  "bucket" $bucket
   "endpoint" ($spec.endpoint | default "")
   "region" ($spec.region | default "us-east-2")
   "credentials" (dict
     "existingSecret" ($credentials.existingSecret | default "")
+  )
+  "azurite" (dict
+    "enabled" $azuriteEnabled
+    "container" $azuriteContainer
+    "persistence" (dict
+      "enabled" $azuritePersistenceEnabled
+      "size" ($azuritePersistence.size | default "2Gi")
+      "storageClassName" ($azuritePersistence.storageClassName | default "")
+    )
   )
   "image" (dict
     "repository" ($image.repository | default "ghcr.io/denoland/celld")

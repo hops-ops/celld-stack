@@ -23,7 +23,8 @@ generate-configuration:
 
 EXAMPLES := \
     examples/celldstacks/minimal.yaml:: \
-    examples/celldstacks/standard.yaml::
+    examples/celldstacks/standard.yaml:: \
+    examples/celldstacks/azurite.yaml::
 
 render\:all:
 	@tmpdir=$$(mktemp -d); \

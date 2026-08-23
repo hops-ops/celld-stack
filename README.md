@@ -20,7 +20,14 @@ spec:
   clusterName: my-cluster
 ```
 
-This installs one celld node in namespace `celld`. Add `spec.bucket` (and credentials) before the process can serve traffic.
+This installs one celld node in namespace `celld`. Add `spec.bucket` (and credentials) for a real fleet, or enable Azurite for local:
+
+```yaml
+spec:
+  clusterName: my-cluster
+  azurite:
+    enabled: true
+```
 
 ### Stage 2: Growing
 
@@ -60,6 +67,8 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 | `endpoint` | string | — | S3-compatible endpoint |
 | `region` | string | `us-east-2` | Object-storage region |
 | `credentials.existingSecret` | string | — | Secret with AWS_* keys in the celld namespace |
+| `azurite.enabled` | boolean | `false` | Deploy in-cluster Azurite and point celld at `az://celld` (local/dev only) |
+| `azurite.container` | string | `celld` | Blob container name |
 | `persistence.size` | string | `10Gi` | CELLD_WATCH volume |
 | `values` | object | — | Helm values merged with defaults |
 | `overrideAllValues` | object | — | Helm values that replace all defaults |
