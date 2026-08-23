@@ -10,7 +10,7 @@
 {{- $clusterName := $spec.clusterName | default $name }}
 {{- $namespace := $spec.namespace | default "celld" }}
 {{- $releaseName := $spec.releaseName | default $name }}
-{{- $chartVersion := $spec.chartVersion | default "0.2.0" }}
+{{- $chartVersion := $spec.chartVersion | default "0.2.1" }}
 {{- $chartRepository := $spec.chartRepository | default "https://hops-ops.github.io/celld-chart" }}
 {{- $chartUrl := $spec.chartUrl | default "" }}
 {{- $replicaCount := $spec.replicaCount | default 1 }}
