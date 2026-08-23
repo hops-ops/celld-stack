@@ -1,0 +1,117 @@
+# code: language=yaml
+#
+# S3 bucket for the celld fleet (aws.enabled).
+
+{{- if $state.aws.enabled }}
+{{- $aws := $state.aws }}
+{{- $bucketK8sName := printf "%s-s3" $state.name }}
+---
+apiVersion: s3.aws.m.upbound.io/v1beta1
+kind: Bucket
+metadata:
+  name: {{ $bucketK8sName }}
+  annotations:
+    {{ setResourceNameAnnotation "s3-bucket" }}
+    crossplane.io/external-name: {{ $aws.bucketName }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    region: {{ $aws.region }}
+    forceDestroy: {{ $aws.forceDestroy }}
+    tags: {{ merge (dict "Name" $aws.bucketName) $state.tags | toJson }}
+  providerConfigRef:
+    name: {{ $state.awsProviderConfigRef.name }}
+    kind: {{ $state.awsProviderConfigRef.kind }}
+---
+apiVersion: s3.aws.m.upbound.io/v1beta1
+kind: BucketPublicAccessBlock
+metadata:
+  name: {{ $bucketK8sName }}-pab
+  annotations:
+    {{ setResourceNameAnnotation "s3-bucket-pab" }}
+    crossplane.io/external-name: {{ $aws.bucketName }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    region: {{ $aws.region }}
+    bucket: {{ $aws.bucketName }}
+    bucketRef:
+      name: {{ $bucketK8sName }}
+    blockPublicAcls: true
+    blockPublicPolicy: true
+    ignorePublicAcls: true
+    restrictPublicBuckets: true
+  providerConfigRef:
+    name: {{ $state.awsProviderConfigRef.name }}
+    kind: {{ $state.awsProviderConfigRef.kind }}
+---
+apiVersion: s3.aws.m.upbound.io/v1beta1
+kind: BucketServerSideEncryptionConfiguration
+metadata:
+  name: {{ $bucketK8sName }}-encryption
+  annotations:
+    {{ setResourceNameAnnotation "s3-bucket-encryption" }}
+    crossplane.io/external-name: {{ $aws.bucketName }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    region: {{ $aws.region }}
+    bucket: {{ $aws.bucketName }}
+    bucketRef:
+      name: {{ $bucketK8sName }}
+    rule:
+      - applyServerSideEncryptionByDefault:
+          sseAlgorithm: AES256
+  providerConfigRef:
+    name: {{ $state.awsProviderConfigRef.name }}
+    kind: {{ $state.awsProviderConfigRef.kind }}
+
+{{- if and $state.observed.bucket.ready $state.observed.bucketPab.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-pab-before-s3-bucket
+  annotations:
+    {{ setResourceNameAnnotation "usage-s3-pab-bucket" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: s3.aws.m.upbound.io/v1beta1
+    kind: Bucket
+    resourceRef:
+      name: {{ $bucketK8sName }}
+  by:
+    apiVersion: s3.aws.m.upbound.io/v1beta1
+    kind: BucketPublicAccessBlock
+    resourceRef:
+      name: {{ $bucketK8sName }}-pab
+{{- end }}
+
+{{- if and $state.observed.bucket.ready $state.observed.bucketEncryption.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-encryption-before-s3-bucket
+  annotations:
+    {{ setResourceNameAnnotation "usage-s3-encryption-bucket" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: s3.aws.m.upbound.io/v1beta1
+    kind: Bucket
+    resourceRef:
+      name: {{ $bucketK8sName }}
+  by:
+    apiVersion: s3.aws.m.upbound.io/v1beta1
+    kind: BucketServerSideEncryptionConfiguration
+    resourceRef:
+      name: {{ $bucketK8sName }}-encryption
+{{- end }}
+{{- end }}

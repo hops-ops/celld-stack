@@ -32,7 +32,8 @@ jobs:
         [
           { "example": "examples/celldstacks/minimal.yaml" },
           { "example": "examples/celldstacks/standard.yaml" },
-          { "example": "examples/celldstacks/azurite.yaml" }
+          { "example": "examples/celldstacks/azurite.yaml" },
+          { "example": "examples/celldstacks/aws.yaml" }
         ]
       api_path: apis/celldstacks
       error_on_missing_schemas: true

@@ -17,8 +17,14 @@
   "credentials" $state.credentials
   "persistence" $state.persistence
   "azurite" $state.azurite
+  "bootstrapPlaceholder" $state.aws.enabled
 }}
 
+{{- $renderHelm := true }}
+{{- if $state.aws.enabled }}
+  {{- $renderHelm = ne $state.observed.bucket.id "" }}
+{{- end }}
+{{- if $renderHelm }}
 ---
 apiVersion: helm.m.crossplane.io/v1beta1
 kind: Release
@@ -76,4 +82,51 @@ spec:
     kind: Release
     resourceRef:
       name: {{ $state.releaseName }}
+{{- end }}
+
+{{- if and $state.aws.enabled $state.observed.bucket.ready $state.observed.release.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-helm-celld-before-s3-bucket
+  annotations:
+    {{ setResourceNameAnnotation "usage-helm-celld-s3-bucket" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: s3.aws.m.upbound.io/v1beta1
+    kind: Bucket
+    resourceRef:
+      name: {{ $state.name }}-s3
+  by:
+    apiVersion: helm.m.crossplane.io/v1beta1
+    kind: Release
+    resourceRef:
+      name: {{ $state.releaseName }}
+{{- end }}
+
+{{- if and $state.aws.enabled $state.observed.awsCreds.ready $state.observed.release.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-helm-celld-before-aws-creds
+  annotations:
+    {{ setResourceNameAnnotation "usage-helm-celld-aws-creds" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: kubernetes.m.crossplane.io/v1alpha1
+    kind: Object
+    resourceRef:
+      name: {{ $state.name }}-aws-creds
+  by:
+    apiVersion: helm.m.crossplane.io/v1beta1
+    kind: Release
+    resourceRef:
+      name: {{ $state.releaseName }}
+{{- end }}
 {{- end }}

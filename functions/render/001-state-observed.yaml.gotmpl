@@ -1,0 +1,49 @@
+# code: language=yaml
+#
+# Observed slices from composed resources.
+
+{{- $observed := $.observed.resources | default dict }}
+
+{{- $readyOf := dict }}
+{{- $idOf := dict }}
+{{- $arnOf := dict }}
+{{- range $key, $entry := $observed }}
+  {{- $resource := $entry.resource | default dict }}
+  {{- $status := $resource.status | default dict }}
+  {{- $atProvider := $status.atProvider | default dict }}
+  {{- $ready := false }}
+  {{- range ($status.conditions | default list) }}
+    {{- if and (eq .type "Ready") (eq .status "True") }}
+      {{- $ready = true }}
+    {{- end }}
+  {{- end }}
+  {{- $readyOf = set $readyOf $key $ready }}
+  {{- $idOf = set $idOf $key ($atProvider.id | default "") }}
+  {{- $arnOf = set $arnOf $key ($atProvider.arn | default "") }}
+{{- end }}
+
+{{- $state = set $state "observed" (merge $state.observed (dict
+  "namespace" (dict "ready" (get $readyOf "namespace" | default false))
+  "release" (dict "ready" (get $readyOf "helm-release-celld" | default false))
+  "bucket" (dict
+    "ready" (get $readyOf "s3-bucket" | default false)
+    "id" (get $idOf "s3-bucket" | default "")
+  )
+  "bucketPab" (dict "ready" (get $readyOf "s3-bucket-pab" | default false))
+  "bucketEncryption" (dict "ready" (get $readyOf "s3-bucket-encryption" | default false))
+  "user" (dict
+    "ready" (get $readyOf "iam-user" | default false)
+    "id" (get $idOf "iam-user" | default "")
+    "arn" (get $arnOf "iam-user" | default "")
+  )
+  "policy" (dict
+    "ready" (get $readyOf "iam-policy" | default false)
+    "arn" (get $arnOf "iam-policy" | default "")
+  )
+  "attachment" (dict "ready" (get $readyOf "iam-policy-attachment" | default false))
+  "accessKey" (dict
+    "ready" (get $readyOf "iam-access-key" | default false)
+    "id" (get $idOf "iam-access-key" | default "")
+  )
+  "awsCreds" (dict "ready" (get $readyOf "aws-creds-secret" | default false))
+)) }}

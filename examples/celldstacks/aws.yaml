@@ -1,0 +1,13 @@
+apiVersion: hops.ops.com.ai/v1alpha1
+kind: CelldStack
+metadata:
+  name: celld
+  namespace: default
+spec:
+  clusterName: production-cluster
+  aws:
+    enabled: true
+    region: us-east-2
+    bucketName: hops-celld-production
+  tags:
+    environment: production

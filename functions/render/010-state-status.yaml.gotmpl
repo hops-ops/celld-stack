@@ -1,37 +1,38 @@
 # code: language=yaml
 #
-# Extract observed state from composed resources.
+# Compute XR status from observed slices.
 
-{{- $observed := $.observed.resources | default dict }}
-
-{{- $checkReady := dict }}
-{{- range $key := list "namespace" "helm-release-celld" "usage-celld-namespace" }}
-  {{- $entry := get $observed $key | default dict }}
-  {{- $resource := $entry.resource | default dict }}
-  {{- $status := $resource.status | default dict }}
-  {{- $ready := false }}
-  {{- range ($status.conditions | default list) }}
-    {{- if and (eq .type "Ready") (eq .status "True") }}
-      {{- $ready = true }}
-    {{- end }}
-  {{- end }}
-  {{- $checkReady = set $checkReady $key $ready }}
-{{- end }}
-
-{{- $namespaceReady := get $checkReady "namespace" }}
-{{- $releaseReady := get $checkReady "helm-release-celld" }}
+{{- $obs := $state.observed }}
+{{- $namespaceReady := $obs.namespace.ready | default false }}
+{{- $releaseReady := $obs.release.ready | default false }}
 {{- $usageReady := true }}
 {{- if and $namespaceReady $releaseReady }}
-  {{- $usageReady = get $checkReady "usage-celld-namespace" }}
+  {{- $usageEntry := get ($.observed.resources | default dict) "usage-celld-namespace" | default dict }}
+  {{- $usageStatus := ($usageEntry.resource | default dict).status | default dict }}
+  {{- $usageReady = false }}
+  {{- range ($usageStatus.conditions | default list) }}
+    {{- if and (eq .type "Ready") (eq .status "True") }}
+      {{- $usageReady = true }}
+    {{- end }}
+  {{- end }}
 {{- end }}
 
-{{- $state = set $state "observed" (dict
-  "namespace" (dict "ready" $namespaceReady)
-  "release" (dict "ready" $releaseReady)
-) }}
+{{- $awsReady := true }}
+{{- if $state.aws.enabled }}
+  {{- $awsReady = and $obs.bucket.ready $obs.user.ready $obs.accessKey.ready }}
+{{- end }}
+
+{{- $bucketStatus := dict "name" "" "id" "" "ready" false }}
+{{- if $state.aws.enabled }}
+  {{- $bucketStatus = dict
+    "name" $state.aws.bucketName
+    "id" ($obs.bucket.id | default "")
+    "ready" ($obs.bucket.ready | default false)
+  }}
+{{- end }}
 
 {{- $state = set $state "status" (dict
-  "ready" (and $namespaceReady $releaseReady $usageReady)
+  "ready" (and $namespaceReady $releaseReady $usageReady $awsReady)
   "release" (dict
     "name" $state.releaseName
     "namespace" $state.namespace
@@ -42,4 +43,5 @@
     "namespace" $state.namespace
     "port" 8080
   )
+  "bucket" $bucketStatus
 ) }}

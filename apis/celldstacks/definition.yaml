@@ -37,6 +37,12 @@ spec:
                 additionalProperties:
                   type: string
                 x-kubernetes-preserve-unknown-fields: true
+              tags:
+                description: Custom tags applied to all AWS resources. Merged with default tags (hops.ops.com.ai/managed, hops.ops.com.ai/celldstack).
+                type: object
+                additionalProperties:
+                  type: string
+                x-kubernetes-preserve-unknown-fields: true
               providerConfigRefs:
                 description: ProviderConfig references for composed Helm and Kubernetes resources. Each defaults to clusterName.
                 type: object
@@ -52,6 +58,16 @@ spec:
                         - ProviderConfig
                         - ClusterProviderConfig
                   kubernetes:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      kind:
+                        type: string
+                        enum:
+                        - ProviderConfig
+                        - ClusterProviderConfig
+                  aws:
                     type: object
                     properties:
                       name:
@@ -79,7 +95,7 @@ spec:
                 description: Helm release name. Defaults to metadata.name.
                 type: string
               chartVersion:
-                description: celld chart version. Defaults to "0.2.2".
+                description: celld chart version. Defaults to "0.3.0".
                 type: string
               chartRepository:
                 description: Helm chart repository. Defaults to https://hops-ops.github.io/celld-chart.
@@ -131,6 +147,24 @@ spec:
                         default: 2Gi
                       storageClassName:
                         type: string
+              aws:
+                description: Provision an S3 bucket and IAM access key, then point celld at s3://<bucket>. Ignored when azurite.enabled is true.
+                type: object
+                properties:
+                  enabled:
+                    description: When true, compose an S3 bucket, IAM user/policy/access key, and a Secret in the celld namespace.
+                    type: boolean
+                    default: false
+                  region:
+                    description: AWS region for the bucket. Defaults to spec.region or us-east-2.
+                    type: string
+                  bucketName:
+                    description: Globally unique S3 bucket name. Defaults to hops-celld-<name>.
+                    type: string
+                  forceDestroy:
+                    description: Allow Crossplane to delete a non-empty bucket. Defaults to true.
+                    type: boolean
+                    default: true
               image:
                 description: celld image settings passed to the chart.
                 type: object
@@ -199,5 +233,15 @@ spec:
                     type: string
                   port:
                     type: integer
+              bucket:
+                description: Observed object-storage bucket.
+                type: object
+                properties:
+                  name:
+                    type: string
+                  id:
+                    type: string
+                  ready:
+                    type: boolean
         required:
         - spec

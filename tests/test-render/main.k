@@ -41,7 +41,7 @@ _items = [
                         chart = {
                             name = "celld"
                             repository = "https://hops-ops.github.io/celld-chart"
-                            version = "0.2.2"
+                            version = "0.3.0"
                         }
                         namespace = "celld"
                     }
@@ -301,6 +301,42 @@ _items = [
                         celld = {bucket = "az://celld"}
                         azurite = {enabled = True, container = "celld"}
                     }
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 10: aws.enabled renders an S3 bucket before the Helm release.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "aws-enabled-renders-s3-bucket"
+        spec = {
+            compositionPath = "apis/celldstacks/composition.yaml"
+            xrdPath = "apis/celldstacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.CelldStack {
+                metadata.name = "aws-test"
+                spec = {
+                    clusterName = "my-cluster"
+                    aws = {
+                        enabled = True
+                        bucketName = "hops-celld-aws-test"
+                    }
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "s3.aws.m.upbound.io/v1beta1"
+                    kind = "Bucket"
+                    metadata.name = "aws-test-s3"
+                    spec.forProvider.region = "us-east-2"
+                }
+                {
+                    apiVersion = "iam.aws.m.upbound.io/v1beta1"
+                    kind = "User"
+                    metadata.name = "aws-test-s3"
                 }
             ]
         }

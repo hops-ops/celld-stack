@@ -1,0 +1,137 @@
+# code: language=yaml
+#
+# IAM user, S3 policy, and attachment so celld can use the fleet bucket.
+
+{{- if $state.aws.enabled }}
+{{- $aws := $state.aws }}
+{{- $userName := printf "%s-s3" $state.name }}
+{{- $policyName := printf "%s-s3" $state.name }}
+{{- $attachmentName := printf "%s-s3" $state.name }}
+---
+apiVersion: iam.aws.m.upbound.io/v1beta1
+kind: User
+metadata:
+  name: {{ $userName }}
+  annotations:
+    {{ setResourceNameAnnotation "iam-user" }}
+    crossplane.io/external-name: {{ $userName }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    forceDestroy: true
+    tags: {{ merge (dict "Name" $userName) $state.tags | toJson }}
+  providerConfigRef:
+    name: {{ $state.awsProviderConfigRef.name }}
+    kind: {{ $state.awsProviderConfigRef.kind }}
+---
+apiVersion: iam.aws.m.upbound.io/v1beta1
+kind: Policy
+metadata:
+  name: {{ $policyName }}
+  annotations:
+    {{ setResourceNameAnnotation "iam-policy" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    policy: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "CelldBucket",
+            "Effect": "Allow",
+            "Action": [
+              "s3:ListBucket",
+              "s3:GetBucketLocation",
+              "s3:ListBucketMultipartUploads"
+            ],
+            "Resource": "arn:aws:s3:::{{ $aws.bucketName }}"
+          },
+          {
+            "Sid": "CelldObjects",
+            "Effect": "Allow",
+            "Action": [
+              "s3:GetObject",
+              "s3:PutObject",
+              "s3:DeleteObject",
+              "s3:AbortMultipartUpload",
+              "s3:ListMultipartUploadParts"
+            ],
+            "Resource": "arn:aws:s3:::{{ $aws.bucketName }}/*"
+          }
+        ]
+      }
+    tags: {{ merge (dict "Name" $policyName) $state.tags | toJson }}
+  providerConfigRef:
+    name: {{ $state.awsProviderConfigRef.name }}
+    kind: {{ $state.awsProviderConfigRef.kind }}
+
+{{- if and (ne $state.observed.user.id "") (ne $state.observed.policy.arn "") }}
+---
+apiVersion: iam.aws.m.upbound.io/v1beta1
+kind: UserPolicyAttachment
+metadata:
+  name: {{ $attachmentName }}
+  annotations:
+    {{ setResourceNameAnnotation "iam-policy-attachment" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    userRef:
+      name: {{ $userName }}
+    policyArnRef:
+      name: {{ $policyName }}
+  providerConfigRef:
+    name: {{ $state.awsProviderConfigRef.name }}
+    kind: {{ $state.awsProviderConfigRef.kind }}
+{{- end }}
+
+{{- if and $state.observed.user.ready $state.observed.attachment.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-s3-attachment-before-user
+  annotations:
+    {{ setResourceNameAnnotation "usage-s3-attachment-user" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: iam.aws.m.upbound.io/v1beta1
+    kind: User
+    resourceRef:
+      name: {{ $userName }}
+  by:
+    apiVersion: iam.aws.m.upbound.io/v1beta1
+    kind: UserPolicyAttachment
+    resourceRef:
+      name: {{ $attachmentName }}
+{{- end }}
+
+{{- if and $state.observed.policy.ready $state.observed.attachment.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-s3-attachment-before-policy
+  annotations:
+    {{ setResourceNameAnnotation "usage-s3-attachment-policy" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: iam.aws.m.upbound.io/v1beta1
+    kind: Policy
+    resourceRef:
+      name: {{ $policyName }}
+  by:
+    apiVersion: iam.aws.m.upbound.io/v1beta1
+    kind: UserPolicyAttachment
+    resourceRef:
+      name: {{ $attachmentName }}
+{{- end }}
+{{- end }}

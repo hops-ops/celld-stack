@@ -10,7 +10,7 @@
 {{- $clusterName := $spec.clusterName | default $name }}
 {{- $namespace := $spec.namespace | default "celld" }}
 {{- $releaseName := $spec.releaseName | default $name }}
-{{- $chartVersion := $spec.chartVersion | default "0.2.2" }}
+{{- $chartVersion := $spec.chartVersion | default "0.3.0" }}
 {{- $chartRepository := $spec.chartRepository | default "https://hops-ops.github.io/celld-chart" }}
 {{- $chartUrl := $spec.chartUrl | default "" }}
 {{- $replicaCount := $spec.replicaCount | default 1 }}
@@ -22,6 +22,7 @@
   $kindKey $name
 }}
 {{- $labels := mergeOverwrite (dict) $defaultLabels ($spec.labels | default dict) }}
+{{- $tags := mergeOverwrite (dict) $defaultLabels ($spec.tags | default dict) }}
 
 {{- $providerConfigRefs := $spec.providerConfigRefs | default dict }}
 {{- $helmFromRefs := $providerConfigRefs.helm | default dict }}
@@ -35,6 +36,11 @@
   "name" ($kubernetesProviderConfigRef.name | default $clusterName)
   "kind" ($kubernetesProviderConfigRef.kind | default "ProviderConfig")
 }}
+{{- $awsProviderConfigRef := $providerConfigRefs.aws | default dict }}
+{{- $awsProviderConfigRef = dict
+  "name" ($awsProviderConfigRef.name | default $clusterName)
+  "kind" ($awsProviderConfigRef.kind | default "ProviderConfig")
+}}
 
 {{- $image := $spec.image | default dict }}
 {{- $persistence := $spec.persistence | default dict }}
@@ -46,9 +52,24 @@
 {{- $azuritePersistence := $azurite.persistence | default dict }}
 {{- $azuritePersistenceEnabled := true }}
 {{- if hasKey $azuritePersistence "enabled" }}{{- $azuritePersistenceEnabled = $azuritePersistence.enabled }}{{- end }}
+{{- $aws := $spec.aws | default dict }}
+{{- $awsEnabled := false }}
+{{- if hasKey $aws "enabled" }}{{- $awsEnabled = $aws.enabled }}{{- end }}
+{{- if $azuriteEnabled }}
+  {{- $awsEnabled = false }}
+{{- end }}
+{{- $awsForceDestroy := true }}
+{{- if hasKey $aws "forceDestroy" }}{{- $awsForceDestroy = $aws.forceDestroy }}{{- end }}
+{{- $awsRegion := $aws.region | default ($spec.region | default "us-east-2") }}
+{{- $awsBucketName := $aws.bucketName | default (printf "hops-celld-%s" $name | lower) }}
+{{- $xrNamespace := $metadata.namespace | default "default" }}
+{{- $awsCredsSecretName := printf "%s-aws" $releaseName }}
+{{- $accessKeySecretName := printf "%s-s3-access-key" $name }}
 {{- $bucket := $spec.bucket | default "" }}
 {{- if $azuriteEnabled }}
   {{- $bucket = printf "az://%s" $azuriteContainer }}
+{{- else if $awsEnabled }}
+  {{- $bucket = printf "s3://%s" $awsBucketName }}
 {{- end }}
 {{- $persistenceEnabled := true }}
 {{- if hasKey $persistence "enabled" }}{{- $persistenceEnabled = $persistence.enabled }}{{- end }}
@@ -69,14 +90,25 @@
   "replicaCount" $replicaCount
   "managementPolicies" $managementPolicies
   "labels" $labels
+  "tags" $tags
+  "xrNamespace" $xrNamespace
   "helmProviderConfigRef" $helmProviderConfigRef
   "kubernetesProviderConfigRef" $kubernetesProviderConfigRef
+  "awsProviderConfigRef" $awsProviderConfigRef
   "serviceName" $serviceName
   "bucket" $bucket
   "endpoint" ($spec.endpoint | default "")
-  "region" ($spec.region | default "us-east-2")
+  "region" $awsRegion
   "credentials" (dict
-    "existingSecret" ($credentials.existingSecret | default "")
+    "existingSecret" ($credentials.existingSecret | default (ternary $awsCredsSecretName "" $awsEnabled))
+  )
+  "aws" (dict
+    "enabled" $awsEnabled
+    "region" $awsRegion
+    "bucketName" $awsBucketName
+    "forceDestroy" $awsForceDestroy
+    "credsSecretName" $awsCredsSecretName
+    "accessKeySecretName" $accessKeySecretName
   )
   "azurite" (dict
     "enabled" $azuriteEnabled

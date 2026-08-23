@@ -1,0 +1,70 @@
+# code: language=yaml
+#
+# Copy AccessKey connection secret into the celld namespace as AWS_* env keys.
+
+{{- if and $state.aws.enabled (ne $state.observed.accessKey.id "") }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-aws-creds
+  annotations:
+    {{ setResourceNameAnnotation "aws-creds-secret" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: {{ $state.aws.credsSecretName }}
+        namespace: {{ $state.namespace }}
+        labels: {{ $state.labels | toJson }}
+      type: Opaque
+  references:
+    - patchesFrom:
+        apiVersion: v1
+        kind: Secret
+        name: {{ $state.aws.accessKeySecretName }}
+        namespace: {{ $state.xrNamespace }}
+        fieldPath: data.attribute.access_key
+      toFieldPath: data.AWS_ACCESS_KEY_ID
+    - patchesFrom:
+        apiVersion: v1
+        kind: Secret
+        name: {{ $state.aws.accessKeySecretName }}
+        namespace: {{ $state.xrNamespace }}
+        fieldPath: data.attribute.secret_key
+      toFieldPath: data.AWS_SECRET_ACCESS_KEY
+    - dependsOn:
+        apiVersion: v1
+        kind: Namespace
+        name: {{ $state.namespace }}
+  providerConfigRef:
+    name: {{ $state.kubernetesProviderConfigRef.name }}
+    kind: {{ $state.kubernetesProviderConfigRef.kind }}
+
+{{- if and $state.observed.accessKey.ready $state.observed.awsCreds.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-aws-creds-before-access-key
+  annotations:
+    {{ setResourceNameAnnotation "usage-aws-creds-access-key" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: iam.aws.m.upbound.io/v1beta1
+    kind: AccessKey
+    resourceRef:
+      name: {{ $state.name }}-s3
+  by:
+    apiVersion: kubernetes.m.crossplane.io/v1alpha1
+    kind: Object
+    resourceRef:
+      name: {{ $state.name }}-aws-creds
+{{- end }}
+{{- end }}

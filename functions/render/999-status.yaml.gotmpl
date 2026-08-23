@@ -17,3 +17,7 @@ status:
     name: {{ $s.service.name | quote }}
     namespace: {{ $s.service.namespace | quote }}
     port: {{ $s.service.port }}
+  bucket:
+    name: {{ $s.bucket.name | quote }}
+    id: {{ $s.bucket.id | quote }}
+    ready: {{ $s.bucket.ready }}

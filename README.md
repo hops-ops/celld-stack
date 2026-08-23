@@ -20,7 +20,7 @@ spec:
   clusterName: my-cluster
 ```
 
-This installs one celld node in namespace `celld`. Add `spec.bucket` (and credentials) for a real fleet, or enable Azurite for local:
+This installs one celld node in namespace `celld`. For local, enable Azurite. For AWS, enable `spec.aws` so the stack creates a bucket and IAM key.
 
 ```yaml
 spec:
@@ -29,21 +29,18 @@ spec:
     enabled: true
 ```
 
-### Stage 2: Growing
-
-Point the fleet at a real bucket, persist local SQLite state, and scale nodes:
+### Stage 2: Growing — AWS S3
 
 ```yaml
 spec:
   clusterName: production-cluster
-  replicaCount: 2
-  bucket: s3://my-cells-bucket
-  region: us-east-2
-  credentials:
-    existingSecret: celld-aws
-  persistence:
-    size: 20Gi
+  aws:
+    enabled: true
+    region: us-east-2
+    bucketName: hops-celld-production
 ```
+
+The stack creates the bucket, an IAM user scoped to that bucket, and an access key Secret in the celld namespace. celld is pointed at `s3://hops-celld-production`.
 
 ### Stage 3: Enterprise Scale
 
@@ -60,7 +57,7 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 | `clusterName` | string | _required_ | Target cluster name; default for ProviderConfig names |
 | `namespace` | string | `celld` | Namespace for the Helm release |
 | `releaseName` | string | metadata.name | Helm release name |
-| `chartVersion` | string | `0.1.0` | celld Helm chart version |
+| `chartVersion` | string | `0.3.0` | celld Helm chart version |
 | `chartUrl` | string | — | Optional packaged-chart URL (skips the Helm repo) |
 | `replicaCount` | integer | `1` | Fleet nodes |
 | `bucket` | string | — | `s3://`, `gs://`, or `az://` bucket |
@@ -69,6 +66,10 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 | `credentials.existingSecret` | string | — | Secret with AWS_* keys in the celld namespace |
 | `azurite.enabled` | boolean | `false` | Deploy in-cluster Azurite and point celld at `az://celld` (local/dev only) |
 | `azurite.container` | string | `celld` | Blob container name |
+| `aws.enabled` | boolean | `false` | Create S3 bucket + IAM access key and point celld at `s3://` |
+| `aws.bucketName` | string | `hops-celld-<name>` | Globally unique S3 bucket name |
+| `aws.region` | string | `us-east-2` | Bucket region |
+| `tags` | object | — | AWS tags merged with defaults |
 | `persistence.size` | string | `10Gi` | CELLD_WATCH volume |
 | `values` | object | — | Helm values merged with defaults |
 | `overrideAllValues` | object | — | Helm values that replace all defaults |
