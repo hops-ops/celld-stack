@@ -62,9 +62,8 @@
 {{- if hasKey $aws "forceDestroy" }}{{- $awsForceDestroy = $aws.forceDestroy }}{{- end }}
 {{- $awsRegion := $aws.region | default ($spec.region | default "us-east-2") }}
 {{- $awsBucketName := $aws.bucketName | default (printf "hops-celld-%s" $name | lower) }}
-{{- $xrNamespace := $metadata.namespace | default "default" }}
-{{- $awsCredsSecretName := printf "%s-aws" $releaseName }}
-{{- $accessKeySecretName := printf "%s-s3-access-key" $name }}
+{{- $awsRolePrefix := $aws.rolePrefix | default "" }}
+{{- $awsPermissionsBoundaryArn := $aws.permissionsBoundaryArn | default "" }}
 {{- $bucket := $spec.bucket | default "" }}
 {{- if $azuriteEnabled }}
   {{- $bucket = printf "az://%s" $azuriteContainer }}
@@ -91,7 +90,6 @@
   "managementPolicies" $managementPolicies
   "labels" $labels
   "tags" $tags
-  "xrNamespace" $xrNamespace
   "helmProviderConfigRef" $helmProviderConfigRef
   "kubernetesProviderConfigRef" $kubernetesProviderConfigRef
   "awsProviderConfigRef" $awsProviderConfigRef
@@ -100,15 +98,22 @@
   "endpoint" ($spec.endpoint | default "")
   "region" $awsRegion
   "credentials" (dict
-    "existingSecret" ($credentials.existingSecret | default (ternary $awsCredsSecretName "" $awsEnabled))
+    "existingSecret" ($credentials.existingSecret | default "")
+  )
+  "serviceAccount" (dict
+    "name" $serviceName
+    "namespace" $namespace
+  )
+  "podIdentity" (dict
+    "name" (printf "%s-celld" $name)
   )
   "aws" (dict
     "enabled" $awsEnabled
     "region" $awsRegion
     "bucketName" $awsBucketName
     "forceDestroy" $awsForceDestroy
-    "credsSecretName" $awsCredsSecretName
-    "accessKeySecretName" $accessKeySecretName
+    "rolePrefix" $awsRolePrefix
+    "permissionsBoundaryArn" $awsPermissionsBoundaryArn
   )
   "azurite" (dict
     "enabled" $azuriteEnabled

@@ -15,6 +15,10 @@
     "region" $state.region
   )
   "credentials" $state.credentials
+  "serviceAccount" (dict
+    "create" true
+    "name" $state.serviceAccount.name
+  )
   "persistence" $state.persistence
   "azurite" $state.azurite
   "bootstrapPlaceholder" $state.aws.enabled
@@ -100,29 +104,6 @@ spec:
     kind: Bucket
     resourceRef:
       name: {{ $state.name }}-s3
-  by:
-    apiVersion: helm.m.crossplane.io/v1beta1
-    kind: Release
-    resourceRef:
-      name: {{ $state.releaseName }}
-{{- end }}
-
-{{- if and $state.aws.enabled $state.observed.awsCreds.ready $state.observed.release.ready }}
----
-apiVersion: protection.crossplane.io/v1beta1
-kind: Usage
-metadata:
-  name: {{ $state.name }}-delete-helm-celld-before-aws-creds
-  annotations:
-    {{ setResourceNameAnnotation "usage-helm-celld-aws-creds" }}
-  labels: {{ $state.labels | toJson }}
-spec:
-  replayDeletion: true
-  of:
-    apiVersion: kubernetes.m.crossplane.io/v1alpha1
-    kind: Object
-    resourceRef:
-      name: {{ $state.name }}-aws-creds
   by:
     apiVersion: helm.m.crossplane.io/v1beta1
     kind: Release

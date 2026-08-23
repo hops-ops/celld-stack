@@ -20,7 +20,7 @@ spec:
   clusterName: my-cluster
 ```
 
-This installs one celld node in namespace `celld`. For local, enable Azurite. For AWS, enable `spec.aws` so the stack creates a bucket and IAM key.
+This installs one celld node in namespace `celld`. For local, enable Azurite. For AWS, enable `spec.aws` so the stack creates a bucket and binds the celld ServiceAccount with EKS Pod Identity.
 
 ```yaml
 spec:
@@ -40,7 +40,7 @@ spec:
     bucketName: hops-celld-production
 ```
 
-The stack creates the bucket, an IAM user scoped to that bucket, and an access key Secret in the celld namespace. celld is pointed at `s3://hops-celld-production`.
+The stack creates the bucket and an EKS Pod Identity for the celld ServiceAccount, scoped to that bucket. celld is pointed at `s3://hops-celld-production` and uses the default AWS credential chain (no static access keys). Requires an EKS cluster with the Pod Identity agent.
 
 ### Stage 3: Enterprise Scale
 
@@ -63,12 +63,13 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 | `bucket` | string | — | `s3://`, `gs://`, or `az://` bucket |
 | `endpoint` | string | — | S3-compatible endpoint |
 | `region` | string | `us-east-2` | Object-storage region |
-| `credentials.existingSecret` | string | — | Secret with AWS_* keys in the celld namespace |
+| `credentials.existingSecret` | string | — | Secret with AWS_* keys (R2 / BYO). Unused when `aws.enabled` |
 | `azurite.enabled` | boolean | `false` | Deploy in-cluster Azurite and point celld at `az://celld` (local/dev only) |
 | `azurite.container` | string | `celld` | Blob container name |
-| `aws.enabled` | boolean | `false` | Create S3 bucket + IAM access key and point celld at `s3://` |
+| `aws.enabled` | boolean | `false` | Create S3 bucket + EKS Pod Identity and point celld at `s3://` |
 | `aws.bucketName` | string | `hops-celld-<name>` | Globally unique S3 bucket name |
 | `aws.region` | string | `us-east-2` | Bucket region |
+| `aws.rolePrefix` | string | — | Prefix for the Pod Identity IAM role |
 | `tags` | object | — | AWS tags merged with defaults |
 | `persistence.size` | string | `10Gi` | CELLD_WATCH volume |
 | `values` | object | — | Helm values merged with defaults |
@@ -78,9 +79,11 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 
 | Field | Meaning |
 |-------|---------|
-| `ready` | Namespace, Helm release, and Usage are Ready |
+| `ready` | Namespace, Helm release, Usage, and (when `aws.enabled`) bucket + Pod Identity are Ready |
 | `release.name` / `release.namespace` | Installed Helm release |
 | `service.name` / `service.port` | Public Worker Service (port 8080) |
+| `bucket.name` / `bucket.id` | Observed S3 bucket when `aws.enabled` |
+| `podIdentity.roleArn` / `podIdentity.associationId` | Observed Pod Identity when `aws.enabled` |
 
 ## Composed Resources
 
@@ -88,7 +91,10 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 |---|---|
 | `<name>-namespace` | `kubernetes.m.crossplane.io/Object` (Namespace) |
 | `<releaseName>` | `helm.m.crossplane.io/Release` |
+| `<name>-s3` | `s3.aws.m.upbound.io/Bucket` (when `aws.enabled`) |
+| `<name>-celld` | `aws.hops.ops.com.ai/PodIdentity` (when `aws.enabled`) |
 | `<name>-delete-helm-celld-before-namespace` | `protection.crossplane.io/Usage` (after both are Ready) |
+| `<name>-delete-helm-celld-before-pod-identity` | `protection.crossplane.io/Usage` (after Helm + Pod Identity are Ready) |
 
 ## Development
 

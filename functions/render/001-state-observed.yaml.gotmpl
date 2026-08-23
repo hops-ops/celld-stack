@@ -22,6 +22,12 @@
   {{- $arnOf = set $arnOf $key ($atProvider.arn | default "") }}
 {{- end }}
 
+{{- $podIdentityEntry := get $observed "pod-identity" | default dict }}
+{{- $podIdentityResource := $podIdentityEntry.resource | default dict }}
+{{- $podIdentityStatus := ($podIdentityResource.status | default dict).podIdentity | default dict }}
+{{- $podIdentityRole := $podIdentityStatus.role | default dict }}
+{{- $podIdentityAssociation := $podIdentityStatus.association | default dict }}
+
 {{- $state = set $state "observed" (merge $state.observed (dict
   "namespace" (dict "ready" (get $readyOf "namespace" | default false))
   "release" (dict "ready" (get $readyOf "helm-release-celld" | default false))
@@ -31,19 +37,9 @@
   )
   "bucketPab" (dict "ready" (get $readyOf "s3-bucket-pab" | default false))
   "bucketEncryption" (dict "ready" (get $readyOf "s3-bucket-encryption" | default false))
-  "user" (dict
-    "ready" (get $readyOf "iam-user" | default false)
-    "id" (get $idOf "iam-user" | default "")
-    "arn" (get $arnOf "iam-user" | default "")
+  "podIdentity" (dict
+    "ready" (get $readyOf "pod-identity" | default false)
+    "roleArn" ($podIdentityAssociation.roleArn | default ($podIdentityRole.arn | default ""))
+    "associationId" ($podIdentityAssociation.id | default "")
   )
-  "policy" (dict
-    "ready" (get $readyOf "iam-policy" | default false)
-    "arn" (get $arnOf "iam-policy" | default "")
-  )
-  "attachment" (dict "ready" (get $readyOf "iam-policy-attachment" | default false))
-  "accessKey" (dict
-    "ready" (get $readyOf "iam-access-key" | default false)
-    "id" (get $idOf "iam-access-key" | default "")
-  )
-  "awsCreds" (dict "ready" (get $readyOf "aws-creds-secret" | default false))
 )) }}

@@ -19,15 +19,21 @@
 
 {{- $awsReady := true }}
 {{- if $state.aws.enabled }}
-  {{- $awsReady = and $obs.bucket.ready $obs.user.ready $obs.accessKey.ready }}
+  {{- $awsReady = and $obs.bucket.ready $obs.podIdentity.ready }}
 {{- end }}
 
 {{- $bucketStatus := dict "name" "" "id" "" "ready" false }}
+{{- $podIdentityStatus := dict "roleArn" "" "associationId" "" "ready" false }}
 {{- if $state.aws.enabled }}
   {{- $bucketStatus = dict
     "name" $state.aws.bucketName
     "id" ($obs.bucket.id | default "")
     "ready" ($obs.bucket.ready | default false)
+  }}
+  {{- $podIdentityStatus = dict
+    "roleArn" ($obs.podIdentity.roleArn | default "")
+    "associationId" ($obs.podIdentity.associationId | default "")
+    "ready" ($obs.podIdentity.ready | default false)
   }}
 {{- end }}
 
@@ -44,4 +50,5 @@
     "port" 8080
   )
   "bucket" $bucketStatus
+  "podIdentity" $podIdentityStatus
 ) }}

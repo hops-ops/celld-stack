@@ -21,3 +21,7 @@ status:
     name: {{ $s.bucket.name | quote }}
     id: {{ $s.bucket.id | quote }}
     ready: {{ $s.bucket.ready }}
+  podIdentity:
+    roleArn: {{ $s.podIdentity.roleArn | quote }}
+    associationId: {{ $s.podIdentity.associationId | quote }}
+    ready: {{ $s.podIdentity.ready }}

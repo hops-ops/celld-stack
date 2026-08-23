@@ -307,10 +307,10 @@ _items = [
     }
 
     # ==========================================================================
-    # Test 10: aws.enabled renders an S3 bucket before the Helm release.
+    # Test 10: aws.enabled renders an S3 bucket and PodIdentity, not IAM users.
     # ==========================================================================
     metav1alpha1.CompositionTest {
-        metadata.name = "aws-enabled-renders-s3-bucket"
+        metadata.name = "aws-enabled-renders-s3-bucket-and-pod-identity"
         spec = {
             compositionPath = "apis/celldstacks/composition.yaml"
             xrdPath = "apis/celldstacks/definition.yaml"
@@ -334,9 +334,17 @@ _items = [
                     spec.forProvider.region = "us-east-2"
                 }
                 {
-                    apiVersion = "iam.aws.m.upbound.io/v1beta1"
-                    kind = "User"
-                    metadata.name = "aws-test-s3"
+                    apiVersion = "aws.hops.ops.com.ai/v1alpha1"
+                    kind = "PodIdentity"
+                    metadata.name = "aws-test-celld"
+                    spec = {
+                        clusterName = "my-cluster"
+                        region = "us-east-2"
+                        serviceAccount = {
+                            name = "aws-test-celld"
+                            namespace = "celld"
+                        }
+                    }
                 }
             ]
         }

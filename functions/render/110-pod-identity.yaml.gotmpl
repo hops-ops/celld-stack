@@ -1,0 +1,86 @@
+# code: language=yaml
+#
+# EKS Pod Identity so the celld ServiceAccount can use the fleet bucket.
+
+{{- if $state.aws.enabled }}
+{{- $aws := $state.aws }}
+---
+apiVersion: aws.hops.ops.com.ai/v1alpha1
+kind: PodIdentity
+metadata:
+  name: {{ $state.podIdentity.name }}
+  annotations:
+    {{ setResourceNameAnnotation "pod-identity" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  clusterName: {{ $state.clusterName }}
+  region: {{ $aws.region }}
+  providerConfigRef:
+    name: {{ $state.awsProviderConfigRef.name }}
+    kind: {{ $state.awsProviderConfigRef.kind }}
+  {{- if $aws.rolePrefix }}
+  rolePrefix: {{ $aws.rolePrefix }}
+  {{- end }}
+  {{- if $aws.permissionsBoundaryArn }}
+  permissionsBoundaryArn: {{ $aws.permissionsBoundaryArn }}
+  {{- end }}
+  serviceAccount:
+    name: {{ $state.serviceAccount.name }}
+    namespace: {{ $state.serviceAccount.namespace }}
+  inlinePolicy:
+    - name: celld-s3
+      policy: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "CelldBucket",
+              "Effect": "Allow",
+              "Action": [
+                "s3:ListBucket",
+                "s3:GetBucketLocation",
+                "s3:ListBucketMultipartUploads"
+              ],
+              "Resource": "arn:aws:s3:::{{ $aws.bucketName }}"
+            },
+            {
+              "Sid": "CelldObjects",
+              "Effect": "Allow",
+              "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:AbortMultipartUpload",
+                "s3:ListMultipartUploadParts"
+              ],
+              "Resource": "arn:aws:s3:::{{ $aws.bucketName }}/*"
+            }
+          ]
+        }
+  labels: {{ $state.labels | toJson }}
+  tags: {{ $state.tags | toJson }}
+
+{{- if and $state.observed.release.ready $state.observed.podIdentity.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-helm-celld-before-pod-identity
+  annotations:
+    {{ setResourceNameAnnotation "usage-helm-celld-pod-identity" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: aws.hops.ops.com.ai/v1alpha1
+    kind: PodIdentity
+    resourceRef:
+      name: {{ $state.podIdentity.name }}
+  by:
+    apiVersion: helm.m.crossplane.io/v1beta1
+    kind: Release
+    resourceRef:
+      name: {{ $state.releaseName }}
+{{- end }}
+{{- end }}
