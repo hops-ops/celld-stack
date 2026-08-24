@@ -22,6 +22,10 @@
   {{- $arnOf = set $arnOf $key ($atProvider.arn | default "") }}
 {{- end }}
 
+{{- $awsCredsEntry := get $observed "aws-creds-secret" | default dict }}
+{{- $awsCredsResource := $awsCredsEntry.resource | default dict }}
+{{- $awsCredsUid := (($awsCredsResource.metadata | default dict).uid | default "") }}
+
 {{- $podIdentityEntry := get $observed "pod-identity" | default dict }}
 {{- $podIdentityResource := $podIdentityEntry.resource | default dict }}
 {{- $podIdentityStatus := ($podIdentityResource.status | default dict).podIdentity | default dict }}
@@ -41,5 +45,9 @@
     "ready" (get $readyOf "pod-identity" | default false)
     "roleArn" ($podIdentityAssociation.roleArn | default ($podIdentityRole.arn | default ""))
     "associationId" ($podIdentityAssociation.id | default "")
+  )
+  "awsCreds" (dict
+    "ready" (get $readyOf "aws-creds-secret" | default false)
+    "id" $awsCredsUid
   )
 )) }}

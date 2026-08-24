@@ -27,6 +27,9 @@
 {{- $renderHelm := true }}
 {{- if $state.aws.enabled }}
   {{- $renderHelm = ne $state.observed.bucket.id "" }}
+  {{- if ne ($state.aws.credentialsSecretRef.localName | default "") "" }}
+    {{- $renderHelm = and $renderHelm (ne $state.observed.awsCreds.id "") }}
+  {{- end }}
 {{- end }}
 {{- if $renderHelm }}
 ---

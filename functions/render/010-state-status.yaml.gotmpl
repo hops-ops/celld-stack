@@ -19,7 +19,13 @@
 
 {{- $awsReady := true }}
 {{- if $state.aws.enabled }}
-  {{- $awsReady = and $obs.bucket.ready $obs.podIdentity.ready }}
+  {{- $awsReady = $obs.bucket.ready }}
+  {{- if $state.aws.podIdentity.enabled }}
+    {{- $awsReady = and $awsReady $obs.podIdentity.ready }}
+  {{- end }}
+  {{- if ne ($state.aws.credentialsSecretRef.localName | default "") "" }}
+    {{- $awsReady = and $awsReady $obs.awsCreds.ready }}
+  {{- end }}
 {{- end }}
 
 {{- $bucketStatus := dict "name" "" "id" "" "ready" false }}

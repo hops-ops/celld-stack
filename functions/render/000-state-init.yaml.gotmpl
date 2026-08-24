@@ -10,7 +10,7 @@
 {{- $clusterName := $spec.clusterName | default $name }}
 {{- $namespace := $spec.namespace | default "celld" }}
 {{- $releaseName := $spec.releaseName | default $name }}
-{{- $chartVersion := $spec.chartVersion | default "0.3.1" }}
+{{- $chartVersion := $spec.chartVersion | default "0.4.0" }}
 {{- $chartRepository := $spec.chartRepository | default "https://hops-ops.github.io/celld-chart" }}
 {{- $chartUrl := $spec.chartUrl | default "" }}
 {{- $replicaCount := $spec.replicaCount | default 1 }}
@@ -64,6 +64,22 @@
 {{- $awsBucketName := $aws.bucketName | default (printf "hops-celld-%s" $name | lower) }}
 {{- $awsRolePrefix := $aws.rolePrefix | default "" }}
 {{- $awsPermissionsBoundaryArn := $aws.permissionsBoundaryArn | default "" }}
+{{- $podIdentitySpec := $aws.podIdentity | default dict }}
+{{- $podIdentityEnabled := true }}
+{{- if hasKey $podIdentitySpec "enabled" }}{{- $podIdentityEnabled = $podIdentitySpec.enabled }}{{- end }}
+{{- if not $awsEnabled }}{{- $podIdentityEnabled = false }}{{- end }}
+{{- $awsCredsRef := $aws.credentialsSecretRef | default dict }}
+{{- $awsCredsName := $awsCredsRef.name | default "" }}
+{{- $xrNamespace := $metadata.namespace | default "default" }}
+{{- $awsCredsNamespace := $awsCredsRef.namespace | default $xrNamespace }}
+{{- $awsCredsKey := $awsCredsRef.key | default "credentials" }}
+{{- if and $awsEnabled (not $podIdentityEnabled) (eq $awsCredsName "") }}
+  {{- $awsCredsName = "aws-creds" }}
+{{- end }}
+{{- $awsCredsLocalName := "" }}
+{{- if and $awsEnabled (ne $awsCredsName "") }}
+  {{- $awsCredsLocalName = printf "%s-aws" $releaseName }}
+{{- end }}
 {{- $bucket := $spec.bucket | default "" }}
 {{- if $azuriteEnabled }}
   {{- $bucket = printf "az://%s" $azuriteContainer }}
@@ -97,8 +113,11 @@
   "bucket" $bucket
   "endpoint" ($spec.endpoint | default "")
   "region" $awsRegion
+  "xrNamespace" $xrNamespace
   "credentials" (dict
     "existingSecret" ($credentials.existingSecret | default "")
+    "sharedCredentialsSecret" $awsCredsLocalName
+    "sharedCredentialsKey" "credentials"
   )
   "serviceAccount" (dict
     "name" $serviceName
@@ -114,6 +133,15 @@
     "forceDestroy" $awsForceDestroy
     "rolePrefix" $awsRolePrefix
     "permissionsBoundaryArn" $awsPermissionsBoundaryArn
+    "podIdentity" (dict
+      "enabled" $podIdentityEnabled
+    )
+    "credentialsSecretRef" (dict
+      "name" $awsCredsName
+      "namespace" $awsCredsNamespace
+      "key" $awsCredsKey
+      "localName" $awsCredsLocalName
+    )
   )
   "azurite" (dict
     "enabled" $azuriteEnabled

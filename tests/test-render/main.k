@@ -41,7 +41,7 @@ _items = [
                         chart = {
                             name = "celld"
                             repository = "https://hops-ops.github.io/celld-chart"
-                            version = "0.3.1"
+                            version = "0.4.0"
                         }
                         namespace = "celld"
                     }
@@ -349,6 +349,43 @@ _items = [
             ]
         }
     }
+
+    # ==========================================================================
+    # Test 11: local S3 copies hops aws-creds and skips PodIdentity.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "aws-local-creds-skip-pod-identity"
+        spec = {
+            compositionPath = "apis/celldstacks/composition.yaml"
+            xrdPath = "apis/celldstacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.CelldStack {
+                metadata.name = "local-s3"
+                spec = {
+                    clusterName = "default"
+                    aws = {
+                        enabled = True
+                        bucketName = "hops-celld-local-s3"
+                        podIdentity = {enabled = False}
+                    }
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "s3.aws.m.upbound.io/v1beta1"
+                    kind = "Bucket"
+                    metadata.name = "local-s3-s3"
+                }
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "local-s3-aws-creds"
+                }
+            ]
+        }
+    }
 ]
 
 items = _items
+

@@ -95,7 +95,7 @@ spec:
                 description: Helm release name. Defaults to metadata.name.
                 type: string
               chartVersion:
-                description: celld chart version. Defaults to "0.3.1".
+                description: celld chart version. Defaults to "0.4.0".
                 type: string
               chartRepository:
                 description: Helm chart repository. Defaults to https://hops-ops.github.io/celld-chart.
@@ -117,11 +117,11 @@ spec:
                 description: Object-storage region. Defaults to us-east-2. Ignored for gs:// and az:// buckets.
                 type: string
               credentials:
-                description: Optional static bucket credentials projected into the celld pod. Unused when spec.aws.enabled is true — that path uses EKS Pod Identity.
+                description: Optional static bucket credentials projected into the celld pod as AWS_* env vars. For hops `local aws` INI secrets, use spec.aws.credentialsSecretRef instead.
                 type: object
                 properties:
                   existingSecret:
-                    description: Name of a Secret in the celld namespace with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (and optional AWS_SESSION_TOKEN). For S3-compatible stores (R2) or BYO keys. Leave empty for EKS Pod Identity.
+                    description: Name of a Secret in the celld namespace with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (and optional AWS_SESSION_TOKEN). For S3-compatible stores (R2) or BYO keys.
                     type: string
               azurite:
                 description: Deploy in-cluster Azurite and point celld at it. Local/dev only — not a production fleet store.
@@ -148,11 +148,11 @@ spec:
                       storageClassName:
                         type: string
               aws:
-                description: Provision an S3 bucket and bind the celld ServiceAccount to it with EKS Pod Identity. Ignored when azurite.enabled is true.
+                description: Provision an S3 bucket and grant the celld pod access. On EKS, Pod Identity is the default. Locally, disable podIdentity and reuse hops `local aws` credentials. Ignored when azurite.enabled is true.
                 type: object
                 properties:
                   enabled:
-                    description: When true, compose an S3 bucket and a PodIdentity for the celld ServiceAccount.
+                    description: When true, compose an S3 bucket and (by default) a PodIdentity for the celld ServiceAccount.
                     type: boolean
                     default: false
                   region:
@@ -171,6 +171,25 @@ spec:
                   permissionsBoundaryArn:
                     description: ARN of the IAM permissions boundary applied to the Pod Identity role.
                     type: string
+                  podIdentity:
+                    description: EKS Pod Identity for the celld ServiceAccount. Disable on kind/local clusters.
+                    type: object
+                    properties:
+                      enabled:
+                        description: When true, compose aws.hops.ops.com.ai/PodIdentity. Defaults to true when aws.enabled is true.
+                        type: boolean
+                        default: true
+                  credentialsSecretRef:
+                    description: Hops `local aws` (or compatible) Secret in AWS shared-credentials INI form. Copied into the celld namespace and mounted for S3. Defaults to aws-creds in the XR namespace when podIdentity.enabled is false.
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                      key:
+                        description: Key in the source Secret. Defaults to credentials.
+                        type: string
               image:
                 description: celld image settings passed to the chart.
                 type: object

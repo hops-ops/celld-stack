@@ -42,6 +42,20 @@ spec:
 
 The stack creates the bucket and an EKS Pod Identity for the celld ServiceAccount, scoped to that bucket. celld is pointed at `s3://hops-celld-production` and uses the default AWS credential chain (no static access keys). Requires an EKS cluster with the Pod Identity agent.
 
+On a local kind cluster, disable Pod Identity and reuse hops `local aws` credentials (the `aws-creds` Secret):
+
+```yaml
+spec:
+  clusterName: default
+  aws:
+    enabled: true
+    region: us-east-2
+    bucketName: hops-celld-s3-034489662075
+    podIdentity:
+      enabled: false
+```
+
+
 ### Stage 3: Enterprise Scale
 
 Use a dedicated S3-compatible store with a key prefix per environment (`s3://cells/prod`), inject credentials from External Secrets, and keep port 8081 on a private network. Gateway / DNS exposure is intentionally out of this stack — compose with your DNS and gateway stacks.
@@ -57,7 +71,7 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 | `clusterName` | string | _required_ | Target cluster name; default for ProviderConfig names |
 | `namespace` | string | `celld` | Namespace for the Helm release |
 | `releaseName` | string | metadata.name | Helm release name |
-| `chartVersion` | string | `0.3.1` | celld Helm chart version |
+| `chartVersion` | string | `0.4.0` | celld Helm chart version |
 | `chartUrl` | string | — | Optional packaged-chart URL (skips the Helm repo) |
 | `replicaCount` | integer | `1` | Fleet nodes |
 | `bucket` | string | — | `s3://`, `gs://`, or `az://` bucket |
@@ -66,9 +80,11 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 | `credentials.existingSecret` | string | — | Secret with AWS_* keys (R2 / BYO). Unused when `aws.enabled` |
 | `azurite.enabled` | boolean | `false` | Deploy in-cluster Azurite and point celld at `az://celld` (local/dev only) |
 | `azurite.container` | string | `celld` | Blob container name |
-| `aws.enabled` | boolean | `false` | Create S3 bucket + EKS Pod Identity and point celld at `s3://` |
+| `aws.enabled` | boolean | `false` | Create S3 bucket and point celld at `s3://` |
 | `aws.bucketName` | string | `hops-celld-<name>` | Globally unique S3 bucket name |
 | `aws.region` | string | `us-east-2` | Bucket region |
+| `aws.podIdentity.enabled` | boolean | `true` | Compose EKS Pod Identity (disable on kind/local) |
+| `aws.credentialsSecretRef` | object | `aws-creds` when Pod Identity is off | Hops `local aws` INI Secret to copy into the celld namespace |
 | `aws.rolePrefix` | string | — | Prefix for the Pod Identity IAM role |
 | `tags` | object | — | AWS tags merged with defaults |
 | `persistence.size` | string | `10Gi` | CELLD_WATCH volume |

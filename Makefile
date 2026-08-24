@@ -25,7 +25,8 @@ EXAMPLES := \
     examples/celldstacks/minimal.yaml:: \
     examples/celldstacks/standard.yaml:: \
     examples/celldstacks/azurite.yaml:: \
-    examples/celldstacks/aws.yaml::
+    examples/celldstacks/aws.yaml:: \
+    examples/celldstacks/aws-local.yaml::
 
 render\:all:
 	@tmpdir=$$(mktemp -d); \

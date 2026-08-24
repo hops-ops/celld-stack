@@ -2,7 +2,7 @@
 #
 # EKS Pod Identity so the celld ServiceAccount can use the fleet bucket.
 
-{{- if $state.aws.enabled }}
+{{- if and $state.aws.enabled $state.aws.podIdentity.enabled }}
 {{- $aws := $state.aws }}
 ---
 apiVersion: aws.hops.ops.com.ai/v1alpha1

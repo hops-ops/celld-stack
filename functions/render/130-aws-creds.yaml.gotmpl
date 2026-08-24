@@ -1,0 +1,64 @@
+# code: language=yaml
+#
+# Copy hops `local aws` shared-credentials Secret into the celld namespace.
+
+{{- $creds := $state.aws.credentialsSecretRef | default dict }}
+{{- if and $state.aws.enabled (ne ($creds.localName | default "") "") }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-aws-creds
+  annotations:
+    {{ setResourceNameAnnotation "aws-creds-secret" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: {{ $creds.localName }}
+        namespace: {{ $state.namespace }}
+        labels: {{ $state.labels | toJson }}
+      type: Opaque
+  references:
+    - patchesFrom:
+        apiVersion: v1
+        kind: Secret
+        name: {{ $creds.name }}
+        namespace: {{ $creds.namespace }}
+        fieldPath: data.{{ $creds.key }}
+      toFieldPath: data.credentials
+    - dependsOn:
+        apiVersion: v1
+        kind: Namespace
+        name: {{ $state.namespace }}
+  providerConfigRef:
+    name: {{ $state.kubernetesProviderConfigRef.name }}
+    kind: {{ $state.kubernetesProviderConfigRef.kind }}
+
+{{- if and $state.observed.awsCreds.ready $state.observed.release.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-helm-celld-before-aws-creds
+  annotations:
+    {{ setResourceNameAnnotation "usage-helm-celld-aws-creds" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: kubernetes.m.crossplane.io/v1alpha1
+    kind: Object
+    resourceRef:
+      name: {{ $state.name }}-aws-creds
+  by:
+    apiVersion: helm.m.crossplane.io/v1beta1
+    kind: Release
+    resourceRef:
+      name: {{ $state.releaseName }}
+{{- end }}
+{{- end }}
