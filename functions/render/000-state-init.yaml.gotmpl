@@ -10,6 +10,7 @@
 {{- $clusterName := $spec.clusterName | default $name }}
 {{- $namespace := $spec.namespace | default "celld" }}
 {{- $releaseName := $spec.releaseName | default $name }}
+# renovate: datasource=github-releases depName=hops-ops/celld-chart
 {{- $chartVersion := $spec.chartVersion | default "0.4.0" }}
 {{- $chartRepository := $spec.chartRepository | default "https://hops-ops.github.io/celld-chart" }}
 {{- $chartUrl := $spec.chartUrl | default "" }}
@@ -43,6 +44,8 @@
 }}
 
 {{- $image := $spec.image | default dict }}
+# renovate: datasource=docker depName=denoland/celld registryUrl=https://ghcr.io
+{{- $imageTag := $image.tag | default "v0.3.0" }}
 {{- $persistence := $spec.persistence | default dict }}
 {{- $credentials := $spec.credentials | default dict }}
 {{- $azurite := $spec.azurite | default dict }}
@@ -154,7 +157,7 @@
   )
   "image" (dict
     "repository" ($image.repository | default "ghcr.io/denoland/celld")
-    "tag" ($image.tag | default "v0.3.0")
+    "tag" $imageTag
     "pullPolicy" ($image.pullPolicy | default "IfNotPresent")
   )
   "persistence" (dict
