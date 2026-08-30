@@ -45,7 +45,7 @@
 
 {{- $image := $spec.image | default dict }}
 # renovate: datasource=docker depName=denoland/celld registryUrl=https://ghcr.io
-{{- $imageTag := $image.tag | default "v0.3.0" }}
+{{- $imageTag := $image.tag | default "0.4.0" }}
 {{- $persistence := $spec.persistence | default dict }}
 {{- $credentials := $spec.credentials | default dict }}
 {{- $azurite := $spec.azurite | default dict }}
