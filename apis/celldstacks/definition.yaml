@@ -200,7 +200,7 @@ spec:
                   tag:
                     type: string
                     # renovate: datasource=docker depName=denoland/celld registryUrl=https://ghcr.io
-                    default: 0.5.0
+                    default: 0.5.1
                   pullPolicy:
                     type: string
                     enum:
