@@ -25,6 +25,18 @@ This installs one celld node in namespace `celld`. For local, enable Azurite. Fo
 ```yaml
 spec:
   clusterName: my-cluster
+  dev:
+    enabled: true
+    hostPath: /var/celld/worker
+```
+
+`dev.enabled` runs `celld dev` against a local object store. It does not create a bucket. `hostPath` must be visible on the node. This needs a celld chart release that understands `values.dev` (newer than 0.4.0).
+
+Azurite remains the bucket-emulator path:
+
+```yaml
+spec:
+  clusterName: my-cluster
   azurite:
     enabled: true
 ```
@@ -78,6 +90,8 @@ Not applicable. This stack installs a Helm release; it does not adopt cloud reso
 | `endpoint` | string | — | S3-compatible endpoint |
 | `region` | string | `us-east-2` | Object-storage region |
 | `credentials.existingSecret` | string | — | Secret with AWS_* keys (R2 / BYO). Unused when `aws.enabled` |
+| `dev.enabled` | boolean | `false` | Run `celld dev` (local store, one project). Ignores bucket, aws, and azurite. Needs a chart release that implements `values.dev` |
+| `dev.hostPath` | string | — | Node path of a Wrangler project. Empty uses the chart placeholder and disables watch |
 | `azurite.enabled` | boolean | `false` | Deploy in-cluster Azurite and point celld at `az://celld` (local/dev only) |
 | `azurite.container` | string | `celld` | Blob container name |
 | `aws.enabled` | boolean | `false` | Create S3 bucket and point celld at `s3://` |

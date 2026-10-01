@@ -48,6 +48,15 @@
 {{- $imageTag := $image.tag | default "0.6.0" }}
 {{- $persistence := $spec.persistence | default dict }}
 {{- $credentials := $spec.credentials | default dict }}
+{{- $dev := $spec.dev | default dict }}
+{{- $devEnabled := false }}
+{{- if hasKey $dev "enabled" }}{{- $devEnabled = $dev.enabled }}{{- end }}
+{{- $devLogs := true }}
+{{- if hasKey $dev "logs" }}{{- $devLogs = $dev.logs }}{{- end }}
+{{- $devWatch := true }}
+{{- if hasKey $dev "watch" }}{{- $devWatch = $dev.watch }}{{- end }}
+{{- $devClean := false }}
+{{- if hasKey $dev "clean" }}{{- $devClean = $dev.clean }}{{- end }}
 {{- $azurite := $spec.azurite | default dict }}
 {{- $azuriteEnabled := false }}
 {{- if hasKey $azurite "enabled" }}{{- $azuriteEnabled = $azurite.enabled }}{{- end }}
@@ -58,8 +67,12 @@
 {{- $aws := $spec.aws | default dict }}
 {{- $awsEnabled := false }}
 {{- if hasKey $aws "enabled" }}{{- $awsEnabled = $aws.enabled }}{{- end }}
-{{- if $azuriteEnabled }}
+{{- if or $azuriteEnabled $devEnabled }}
   {{- $awsEnabled = false }}
+{{- end }}
+{{- if $devEnabled }}
+  {{- $azuriteEnabled = false }}
+  {{- $replicaCount = 1 }}
 {{- end }}
 {{- $awsForceDestroy := true }}
 {{- if hasKey $aws "forceDestroy" }}{{- $awsForceDestroy = $aws.forceDestroy }}{{- end }}
@@ -84,7 +97,9 @@
   {{- $awsCredsLocalName = printf "%s-aws" $releaseName }}
 {{- end }}
 {{- $bucket := $spec.bucket | default "" }}
-{{- if $azuriteEnabled }}
+{{- if $devEnabled }}
+  {{- $bucket = "" }}
+{{- else if $azuriteEnabled }}
   {{- $bucket = printf "az://%s" $azuriteContainer }}
 {{- else if $awsEnabled }}
   {{- $bucket = printf "s3://%s" $awsBucketName }}
@@ -145,6 +160,15 @@
       "key" $awsCredsKey
       "localName" $awsCredsLocalName
     )
+  )
+  "dev" (dict
+    "enabled" $devEnabled
+    "hostPath" ($dev.hostPath | default "")
+    "mountPath" ($dev.mountPath | default "/workspace")
+    "port" ($dev.port | default 8080)
+    "logs" $devLogs
+    "watch" $devWatch
+    "clean" $devClean
   )
   "azurite" (dict
     "enabled" $azuriteEnabled
