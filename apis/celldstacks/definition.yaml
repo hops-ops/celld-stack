@@ -123,8 +123,39 @@ spec:
                   existingSecret:
                     description: Name of a Secret in the celld namespace with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (and optional AWS_SESSION_TOKEN). For S3-compatible stores (R2) or BYO keys.
                     type: string
+              dev:
+                description: Run celld dev (local object store, one Wrangler project) instead of a bucket-backed fleet node. Ignores bucket, aws, and azurite. Requires a celld chart that implements values.dev.
+                type: object
+                properties:
+                  enabled:
+                    description: When true, the chart runs `celld dev` on one replica.
+                    type: boolean
+                    default: false
+                  hostPath:
+                    description: Node path of a Wrangler project. Must be visible on the kubelet (kind extraMounts). Empty uses the chart placeholder worker and disables watch.
+                    type: string
+                  mountPath:
+                    description: Mount path inside the pod. Defaults to /workspace.
+                    type: string
+                    default: /workspace
+                  port:
+                    description: Worker listener port. Defaults to 8080.
+                    type: integer
+                    default: 8080
+                  logs:
+                    description: Pass --logs. Defaults to true.
+                    type: boolean
+                    default: true
+                  watch:
+                    description: Watch the project and rebuild. Forced off when hostPath is empty.
+                    type: boolean
+                    default: true
+                  clean:
+                    description: Pass --clean to delete .celld/dev before start.
+                    type: boolean
+                    default: false
               azurite:
-                description: Deploy in-cluster Azurite and point celld at it. Local/dev only — not a production fleet store.
+                description: Deploy in-cluster Azurite and point celld at it. Local/dev only — not a production fleet store. Ignored when dev.enabled is true.
                 type: object
                 properties:
                   enabled:
@@ -148,7 +179,7 @@ spec:
                       storageClassName:
                         type: string
               aws:
-                description: Provision an S3 bucket and grant the celld pod access. On EKS, Pod Identity is the default. Locally, disable podIdentity and reuse hops `local aws` credentials. Ignored when azurite.enabled is true.
+                description: Provision an S3 bucket and grant the celld pod access. On EKS, Pod Identity is the default. Locally, disable podIdentity and reuse hops `local aws` credentials. Ignored when azurite.enabled or dev.enabled is true.
                 type: object
                 properties:
                   enabled:

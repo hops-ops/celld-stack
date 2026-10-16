@@ -34,6 +34,7 @@ jobs:
           { "example": "examples/celldstacks/minimal.yaml" },
           { "example": "examples/celldstacks/standard.yaml" },
           { "example": "examples/celldstacks/azurite.yaml" },
+          { "example": "examples/celldstacks/dev.yaml" },
           { "example": "examples/celldstacks/aws.yaml" },
           { "example": "examples/celldstacks/aws-local.yaml" }
         ]

@@ -25,6 +25,7 @@ EXAMPLES := \
     examples/celldstacks/minimal.yaml:: \
     examples/celldstacks/standard.yaml:: \
     examples/celldstacks/azurite.yaml:: \
+    examples/celldstacks/dev.yaml:: \
     examples/celldstacks/aws.yaml:: \
     examples/celldstacks/aws-local.yaml::
 

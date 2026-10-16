@@ -308,6 +308,41 @@ _items = [
     }
 
     # ==========================================================================
+    # Test 9b: dev.enabled runs celld dev and does not configure a fleet bucket.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "dev-enabled-skips-bucket"
+        spec = {
+            compositionPath = "apis/celldstacks/composition.yaml"
+            xrdPath = "apis/celldstacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.CelldStack {
+                metadata.name = "dev-test"
+                spec = {
+                    clusterName = "my-cluster"
+                    dev = {enabled = True, hostPath = "/var/celld/worker"}
+                    azurite = {enabled = True}
+                    aws = {enabled = True}
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "dev-test"
+                    spec.forProvider.values = {
+                        replicaCount = 1
+                        dev = {enabled = True, hostPath = "/var/celld/worker"}
+                        azurite = {enabled = False}
+                        celld = {bucket = ""}
+                    }
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
     # Test 10: aws.enabled renders an S3 bucket and PodIdentity, not IAM users.
     # ==========================================================================
     metav1alpha1.CompositionTest {
