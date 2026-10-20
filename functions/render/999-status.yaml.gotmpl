@@ -25,3 +25,8 @@ status:
     roleArn: {{ $s.podIdentity.roleArn | quote }}
     associationId: {{ $s.podIdentity.associationId | quote }}
     ready: {{ $s.podIdentity.ready }}
+  rustfs:
+    endpoint: {{ $s.rustfs.endpoint | quote }}
+    credentialsSecret: {{ $s.rustfs.credentialsSecret | quote }}
+    buckets: {{ $s.rustfs.buckets | toJson }}
+    ready: {{ $s.rustfs.ready }}

@@ -1,0 +1,70 @@
+# Observed state for examples/celldstacks/rustfs.yaml once every step is up:
+# credentials copied, RustFS installed, buckets created, celld installed.
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: celld-namespace
+  namespace: default
+  annotations:
+    crossplane.io/composition-resource-name: namespace
+status:
+  conditions:
+    - type: Ready
+      status: "True"
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: celld-rustfs-creds
+  namespace: default
+  uid: 0b6d3f0e-0000-4000-8000-000000000001
+  annotations:
+    crossplane.io/composition-resource-name: rustfs-creds-secret
+status:
+  conditions:
+    - type: Ready
+      status: "True"
+---
+apiVersion: helm.m.crossplane.io/v1beta1
+kind: Release
+metadata:
+  name: celld-rustfs
+  namespace: default
+  annotations:
+    crossplane.io/composition-resource-name: helm-release-rustfs
+status:
+  atProvider:
+    revision: 1
+  conditions:
+    - type: Ready
+      status: "True"
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: celld-rustfs-buckets-ea80c0f0
+  namespace: default
+  annotations:
+    crossplane.io/composition-resource-name: rustfs-buckets-job
+status:
+  atProvider:
+    manifest:
+      status:
+        succeeded: 1
+  conditions:
+    - type: Ready
+      status: "True"
+---
+apiVersion: helm.m.crossplane.io/v1beta1
+kind: Release
+metadata:
+  name: celld
+  namespace: default
+  annotations:
+    crossplane.io/composition-resource-name: helm-release-celld
+status:
+  atProvider:
+    revision: 1
+  conditions:
+    - type: Ready
+      status: "True"

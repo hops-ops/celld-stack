@@ -28,6 +28,21 @@
   {{- end }}
 {{- end }}
 
+{{- $rustfsReady := true }}
+{{- if $state.rustfs.enabled }}
+  {{- $rustfsReady = and $obs.rustfsCreds.ready $obs.rustfsRelease.ready $obs.rustfsBuckets.succeeded }}
+{{- end }}
+
+{{- $rustfsStatus := dict "endpoint" "" "credentialsSecret" "" "buckets" (list) "ready" false }}
+{{- if $state.rustfs.enabled }}
+  {{- $rustfsStatus = dict
+    "endpoint" $state.rustfs.endpoint
+    "credentialsSecret" $state.rustfs.name
+    "buckets" (ternary $state.rustfs.buckets (list) $obs.rustfsBuckets.succeeded)
+    "ready" $rustfsReady
+  }}
+{{- end }}
+
 {{- $bucketStatus := dict "name" "" "id" "" "ready" false }}
 {{- $podIdentityStatus := dict "roleArn" "" "associationId" "" "ready" false }}
 {{- if $state.aws.enabled }}
@@ -44,7 +59,7 @@
 {{- end }}
 
 {{- $state = set $state "status" (dict
-  "ready" (and $namespaceReady $releaseReady $usageReady $awsReady)
+  "ready" (and $namespaceReady $releaseReady $usageReady $awsReady $rustfsReady)
   "release" (dict
     "name" $state.releaseName
     "namespace" $state.namespace
@@ -57,4 +72,5 @@
   )
   "bucket" $bucketStatus
   "podIdentity" $podIdentityStatus
+  "rustfs" $rustfsStatus
 ) }}

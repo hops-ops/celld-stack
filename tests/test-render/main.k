@@ -386,6 +386,188 @@ _items = [
             ]
         }
     }
+
+    # ==========================================================================
+    # Test 12: rustfs.enabled first copies credentials and waits to install.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "rustfs-copies-credentials-before-installing"
+        spec = {
+            compositionPath = "apis/celldstacks/composition.yaml"
+            xrdPath = "apis/celldstacks/definition.yaml"
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.CelldStack {
+                metadata.name = "celld"
+                metadata.namespace = "game"
+                spec = {
+                    clusterName = "my-cluster"
+                    rustfs = {enabled = True}
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "celld-rustfs-creds"
+                    spec.forProvider.manifest = {
+                        apiVersion = "v1"
+                        kind = "Secret"
+                        metadata = {name = "celld-rustfs", namespace = "celld"}
+                        data = {
+                            S3_ENDPOINT = "aHR0cDovL2NlbGxkLXJ1c3Rmcy1zdmMuY2VsbGQuc3ZjLmNsdXN0ZXIubG9jYWw6OTAwMA=="
+                            AWS_REGION = "dXMtZWFzdC0x"
+                        }
+                    }
+                }
+                {
+                    apiVersion = "hops.ops.com.ai/v1alpha1"
+                    kind = "CelldStack"
+                    status.rustfs = {
+                        endpoint = "http://celld-rustfs-svc.celld.svc.cluster.local:9000"
+                        ready = False
+                    }
+                }
+            ]
+        }
+    }
+
+    # ==========================================================================
+    # Test 13: with RustFS up and buckets created, celld targets RustFS.
+    # ==========================================================================
+    metav1alpha1.CompositionTest {
+        metadata.name = "rustfs-ready-points-celld-at-rustfs"
+        spec = {
+            compositionPath = "apis/celldstacks/composition.yaml"
+            xrdPath = "apis/celldstacks/definition.yaml"
+            observedResources = [
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata = {
+                        name = "celld-namespace"
+                        annotations = {"crossplane.io/composition-resource-name" = "namespace"}
+                    }
+                    status.conditions = [{type = "Ready", status = "True"}]
+                }
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata = {
+                        name = "celld-rustfs-creds"
+                        uid = "0b6d3f0e-0000-4000-8000-000000000001"
+                        annotations = {"crossplane.io/composition-resource-name" = "rustfs-creds-secret"}
+                    }
+                    status.conditions = [{type = "Ready", status = "True"}]
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata = {
+                        name = "celld-rustfs"
+                        annotations = {"crossplane.io/composition-resource-name" = "helm-release-rustfs"}
+                    }
+                    status = {
+                        atProvider.revision = 1
+                        conditions = [{type = "Ready", status = "True"}]
+                    }
+                }
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata = {
+                        name = "celld-rustfs-buckets-ea80c0f0"
+                        annotations = {"crossplane.io/composition-resource-name" = "rustfs-buckets-job"}
+                    }
+                    status = {
+                        atProvider.manifest.status.succeeded = 1
+                        conditions = [{type = "Ready", status = "True"}]
+                    }
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata = {
+                        name = "celld"
+                        annotations = {"crossplane.io/composition-resource-name" = "helm-release-celld"}
+                    }
+                    status = {
+                        atProvider.revision = 1
+                        conditions = [{type = "Ready", status = "True"}]
+                    }
+                }
+            ]
+            timeoutSeconds = 60
+            validate = False
+            xr = stacksv1alpha1.CelldStack {
+                metadata.name = "celld"
+                metadata.namespace = "default"
+                spec = {
+                    clusterName = "my-cluster"
+                    rustfs = {
+                        enabled = True
+                        buckets = ["game-services"]
+                        credentialsSecretRef.name = "celld-rustfs-credentials"
+                    }
+                }
+            }
+            assertResources = [
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "celld-rustfs"
+                    spec.forProvider = {
+                        chart = {
+                            name = "rustfs"
+                            repository = "https://charts.rustfs.com"
+                            version = "1.0.3"
+                        }
+                        namespace = "celld"
+                        values = {
+                            fullnameOverride = "celld-rustfs"
+                            mode.standalone.enabled = True
+                            secret.existingSecret = "celld-rustfs"
+                            ingress.enabled = False
+                        }
+                    }
+                }
+                {
+                    apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
+                    kind = "Object"
+                    metadata.name = "celld-rustfs-buckets-ea80c0f0"
+                }
+                {
+                    apiVersion = "helm.m.crossplane.io/v1beta1"
+                    kind = "Release"
+                    metadata.name = "celld"
+                    spec.forProvider.values = {
+                        bootstrapPlaceholder = False
+                        celld = {
+                            bucket = "s3://celld"
+                            endpoint = "http://celld-rustfs-svc.celld.svc.cluster.local:9000"
+                            region = "us-east-1"
+                        }
+                        credentials = {existingSecret = "celld-rustfs"}
+                        azurite = {enabled = False}
+                    }
+                }
+                {
+                    apiVersion = "protection.crossplane.io/v1beta1"
+                    kind = "Usage"
+                    metadata.name = "celld-delete-helm-celld-before-rustfs"
+                }
+                {
+                    apiVersion = "hops.ops.com.ai/v1alpha1"
+                    kind = "CelldStack"
+                    status.rustfs = {
+                        credentialsSecret = "celld-rustfs"
+                        buckets = ["celld", "game-services"]
+                        ready = True
+                    }
+                }
+            ]
+        }
+    }
 ]
 
 items = _items

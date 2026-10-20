@@ -147,8 +147,48 @@ spec:
                         default: 2Gi
                       storageClassName:
                         type: string
+              rustfs:
+                description: Deploy in-cluster RustFS (S3-compatible) and point celld at it. Takes precedence over azurite and aws. Local/dev and single-node use.
+                type: object
+                properties:
+                  enabled:
+                    description: When true, install RustFS (standalone), create the buckets, and configure celld for s3://<bucket> on the RustFS endpoint.
+                    type: boolean
+                    default: false
+                  bucket:
+                    description: celld fleet bucket name. Defaults to "celld".
+                    type: string
+                    pattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
+                  buckets:
+                    description: Additional buckets to create for applications (for example game-services blobs). The fleet bucket is always created.
+                    type: array
+                    items:
+                      type: string
+                      pattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
+                  credentialsSecretRef:
+                    description: Secret holding the RustFS root credentials as RUSTFS_ACCESS_KEY and RUSTFS_SECRET_KEY. Copied into the release namespace with AWS_* aliases and S3_ENDPOINT. Defaults to <name>-rustfs-credentials in the XR namespace. Must not be the copied Secret itself (<releaseName>-rustfs in the release namespace). No credentials are generated or stored in the manifest.
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                  persistence:
+                    description: Persistent volume for RustFS object data.
+                    type: object
+                    properties:
+                      size:
+                        type: string
+                        default: 2Gi
+                      storageClassName:
+                        description: Storage class. Empty uses the cluster default.
+                        type: string
+                  values:
+                    description: Helm values merged on top of the RustFS chart defaults set by this stack.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
               aws:
-                description: Provision an S3 bucket and grant the celld pod access. On EKS, Pod Identity is the default. Locally, disable podIdentity and reuse hops `local aws` credentials. Ignored when azurite.enabled is true.
+                description: Provision an S3 bucket and grant the celld pod access. On EKS, Pod Identity is the default. Locally, disable podIdentity and reuse hops `local aws` credentials. Ignored when azurite.enabled or rustfs.enabled is true.
                 type: object
                 properties:
                   enabled:
@@ -237,7 +277,7 @@ spec:
             type: object
             properties:
               ready:
-                description: Whether the namespace, Helm release, and deletion Usage are ready.
+                description: Whether the namespace, Helm releases, buckets, and deletion Usage are ready.
                 type: boolean
               release:
                 description: Observed Helm release.
@@ -267,6 +307,23 @@ spec:
                     type: string
                   id:
                     type: string
+                  ready:
+                    type: boolean
+              rustfs:
+                description: Observed in-cluster RustFS object store.
+                type: object
+                properties:
+                  endpoint:
+                    description: In-cluster S3 endpoint URL.
+                    type: string
+                  credentialsSecret:
+                    description: Secret in the release namespace with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION and S3_ENDPOINT for S3 clients.
+                    type: string
+                  buckets:
+                    description: Buckets the bucket Job created or found.
+                    type: array
+                    items:
+                      type: string
                   ready:
                     type: boolean
               podIdentity:

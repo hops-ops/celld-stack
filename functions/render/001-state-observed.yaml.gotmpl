@@ -26,6 +26,19 @@
 {{- $awsCredsResource := $awsCredsEntry.resource | default dict }}
 {{- $awsCredsUid := (($awsCredsResource.metadata | default dict).uid | default "") }}
 
+{{- $revisionOf := dict }}
+{{- range $key, $entry := $observed }}
+  {{- $atProvider := (($entry.resource | default dict).status | default dict).atProvider | default dict }}
+  {{- $revisionOf = set $revisionOf $key (gt (int ($atProvider.revision | default 0)) 0) }}
+{{- end }}
+
+{{- $rustfsCredsEntry := get $observed "rustfs-creds-secret" | default dict }}
+{{- $rustfsCredsUid := ((($rustfsCredsEntry.resource | default dict).metadata | default dict).uid | default "") }}
+
+{{- $rustfsBucketsEntry := get $observed "rustfs-buckets-job" | default dict }}
+{{- $rustfsBucketsManifest := ((($rustfsBucketsEntry.resource | default dict).status | default dict).atProvider | default dict).manifest | default dict }}
+{{- $rustfsBucketsSucceeded := gt (int (($rustfsBucketsManifest.status | default dict).succeeded | default 0)) 0 }}
+
 {{- $podIdentityEntry := get $observed "pod-identity" | default dict }}
 {{- $podIdentityResource := $podIdentityEntry.resource | default dict }}
 {{- $podIdentityStatus := ($podIdentityResource.status | default dict).podIdentity | default dict }}
@@ -34,7 +47,22 @@
 
 {{- $state = set $state "observed" (merge $state.observed (dict
   "namespace" (dict "ready" (get $readyOf "namespace" | default false))
-  "release" (dict "ready" (get $readyOf "helm-release-celld" | default false))
+  "release" (dict
+    "ready" (get $readyOf "helm-release-celld" | default false)
+    "exists" (get $revisionOf "helm-release-celld" | default false)
+  )
+  "rustfsCreds" (dict
+    "ready" (get $readyOf "rustfs-creds-secret" | default false)
+    "id" $rustfsCredsUid
+  )
+  "rustfsRelease" (dict
+    "ready" (get $readyOf "helm-release-rustfs" | default false)
+    "exists" (get $revisionOf "helm-release-rustfs" | default false)
+  )
+  "rustfsBuckets" (dict
+    "ready" (get $readyOf "rustfs-buckets-job" | default false)
+    "succeeded" $rustfsBucketsSucceeded
+  )
   "bucket" (dict
     "ready" (get $readyOf "s3-bucket" | default false)
     "id" (get $idOf "s3-bucket" | default "")

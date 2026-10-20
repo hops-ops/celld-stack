@@ -55,10 +55,16 @@
 {{- $azuritePersistence := $azurite.persistence | default dict }}
 {{- $azuritePersistenceEnabled := true }}
 {{- if hasKey $azuritePersistence "enabled" }}{{- $azuritePersistenceEnabled = $azuritePersistence.enabled }}{{- end }}
+{{- $rustfs := $spec.rustfs | default dict }}
+{{- $rustfsEnabled := false }}
+{{- if hasKey $rustfs "enabled" }}{{- $rustfsEnabled = $rustfs.enabled }}{{- end }}
+{{- if $rustfsEnabled }}
+  {{- $azuriteEnabled = false }}
+{{- end }}
 {{- $aws := $spec.aws | default dict }}
 {{- $awsEnabled := false }}
 {{- if hasKey $aws "enabled" }}{{- $awsEnabled = $aws.enabled }}{{- end }}
-{{- if $azuriteEnabled }}
+{{- if or $azuriteEnabled $rustfsEnabled }}
   {{- $awsEnabled = false }}
 {{- end }}
 {{- $awsForceDestroy := true }}
@@ -83,8 +89,27 @@
 {{- if and $awsEnabled (ne $awsCredsName "") }}
   {{- $awsCredsLocalName = printf "%s-aws" $releaseName }}
 {{- end }}
+{{- $rustfsName := printf "%s-rustfs" $releaseName }}
+{{- $rustfsBucket := $rustfs.bucket | default "celld" }}
+{{- $rustfsBuckets := list $rustfsBucket }}
+{{- range ($rustfs.buckets | default list) }}
+  {{- if not (has . $rustfsBuckets) }}
+    {{- $rustfsBuckets = append $rustfsBuckets . }}
+  {{- end }}
+{{- end }}
+{{- $rustfsCredsRef := $rustfs.credentialsSecretRef | default dict }}
+{{- $rustfsPersistence := $rustfs.persistence | default dict }}
+{{- $rustfsEndpoint := printf "http://%s-svc.%s.svc.cluster.local:9000" $rustfsName $namespace }}
+{{- $endpoint := $spec.endpoint | default "" }}
+{{- $existingSecret := $credentials.existingSecret | default "" }}
+{{- if $rustfsEnabled }}
+  {{- $endpoint = $rustfsEndpoint }}
+  {{- $existingSecret = $rustfsName }}
+{{- end }}
 {{- $bucket := $spec.bucket | default "" }}
-{{- if $azuriteEnabled }}
+{{- if $rustfsEnabled }}
+  {{- $bucket = printf "s3://%s" $rustfsBucket }}
+{{- else if $azuriteEnabled }}
   {{- $bucket = printf "az://%s" $azuriteContainer }}
 {{- else if $awsEnabled }}
   {{- $bucket = printf "s3://%s" $awsBucketName }}
@@ -114,11 +139,11 @@
   "awsProviderConfigRef" $awsProviderConfigRef
   "serviceName" $serviceName
   "bucket" $bucket
-  "endpoint" ($spec.endpoint | default "")
-  "region" $awsRegion
+  "endpoint" $endpoint
+  "region" (ternary "us-east-1" $awsRegion $rustfsEnabled)
   "xrNamespace" $xrNamespace
   "credentials" (dict
-    "existingSecret" ($credentials.existingSecret | default "")
+    "existingSecret" $existingSecret
     "sharedCredentialsSecret" $awsCredsLocalName
     "sharedCredentialsKey" "credentials"
   )
@@ -154,6 +179,22 @@
       "size" ($azuritePersistence.size | default "2Gi")
       "storageClassName" ($azuritePersistence.storageClassName | default "")
     )
+  )
+  "rustfs" (dict
+    "enabled" $rustfsEnabled
+    "name" $rustfsName
+    "endpoint" $rustfsEndpoint
+    "bucket" $rustfsBucket
+    "buckets" $rustfsBuckets
+    "credentialsSecretRef" (dict
+      "name" ($rustfsCredsRef.name | default (printf "%s-rustfs-credentials" $name))
+      "namespace" ($rustfsCredsRef.namespace | default $xrNamespace)
+    )
+    "persistence" (dict
+      "size" ($rustfsPersistence.size | default "2Gi")
+      "storageClassName" ($rustfsPersistence.storageClassName | default "")
+    )
+    "values" ($rustfs.values | default dict)
   )
   "image" (dict
     "repository" ($image.repository | default "ghcr.io/denoland/celld")
