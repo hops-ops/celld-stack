@@ -440,12 +440,14 @@ _items = [
         spec = {
             compositionPath = "apis/celldstacks/composition.yaml"
             xrdPath = "apis/celldstacks/definition.yaml"
+            # Namespaced XR: observed MRs must carry the XR namespace to match.
             observedResources = [
                 {
                     apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
                     kind = "Object"
                     metadata = {
                         name = "celld-namespace"
+                        namespace = "default"
                         annotations = {"crossplane.io/composition-resource-name" = "namespace"}
                     }
                     status.conditions = [{type = "Ready", status = "True"}]
@@ -455,6 +457,7 @@ _items = [
                     kind = "Object"
                     metadata = {
                         name = "celld-rustfs-creds"
+                        namespace = "default"
                         uid = "0b6d3f0e-0000-4000-8000-000000000001"
                         annotations = {"crossplane.io/composition-resource-name" = "rustfs-creds-secret"}
                     }
@@ -465,6 +468,7 @@ _items = [
                     kind = "Release"
                     metadata = {
                         name = "celld-rustfs"
+                        namespace = "default"
                         annotations = {"crossplane.io/composition-resource-name" = "helm-release-rustfs"}
                     }
                     status = {
@@ -477,6 +481,7 @@ _items = [
                     kind = "Object"
                     metadata = {
                         name = "celld-rustfs-buckets-ea80c0f0"
+                        namespace = "default"
                         annotations = {"crossplane.io/composition-resource-name" = "rustfs-buckets-job"}
                     }
                     status = {
@@ -489,6 +494,7 @@ _items = [
                     kind = "Release"
                     metadata = {
                         name = "celld"
+                        namespace = "default"
                         annotations = {"crossplane.io/composition-resource-name" = "helm-release-celld"}
                     }
                     status = {
