@@ -12,6 +12,104 @@
 # 3. Create the fleet bucket and any extra buckets with a one-shot Job, and
 #    deploy a placeholder Worker once if the fleet bucket has no deployment.
 
+{{- /* Bucket Job spec. Rendered once, hashed into the Job name (a Job's pod
+     template is immutable, so any change to it must create a new Job). */}}
+{{- define "celldstack.rustfsBucketJobSpec" }}
+{{- $s := .state }}
+{{- $r := .rustfs }}
+backoffLimit: 10
+template:
+  metadata:
+    labels: {{ $s.labels | toJson }}
+  spec:
+    restartPolicy: OnFailure
+    volumes:
+      - name: work
+        emptyDir: {}
+    initContainers:
+      - name: create-buckets
+        # renovate: datasource=docker depName=amazon/aws-cli
+        image: amazon/aws-cli:2.31.13
+        command:
+          - /bin/sh
+          - -c
+          - |
+            set -eu
+            i=0
+            until aws --endpoint-url "$S3_ENDPOINT" s3api list-buckets >/dev/null; do
+              i=$((i + 1))
+              if [ "$i" -ge 60 ]; then echo "RustFS is not reachable" >&2; exit 1; fi
+              sleep 2
+            done
+            for bucket in {{ $r.buckets | join " " }}; do
+              if aws --endpoint-url "$S3_ENDPOINT" s3api head-bucket --bucket "$bucket" 2>/dev/null; then
+                echo "bucket $bucket exists"
+              else
+                aws --endpoint-url "$S3_ENDPOINT" s3api create-bucket --bucket "$bucket"
+                echo "bucket $bucket created"
+              fi
+            done
+            # Only a 404 means "no deployment yet". Any other error (auth,
+            # network, 5xx) fails the Job so it retries, and never deploys
+            # the placeholder over an application.
+            if out=$(aws --endpoint-url "$S3_ENDPOINT" s3api head-object --bucket {{ $r.bucket }} --key deploy/current.json 2>&1); then
+              echo "s3://{{ $r.bucket }}/deploy/current.json exists"
+            elif printf '%s' "$out" | grep -q '(404)'; then
+              touch /work/needs-deployment
+            else
+              printf '%s\n' "$out" >&2
+              exit 1
+            fi
+        envFrom:
+          - secretRef:
+              name: {{ $r.name }}
+        volumeMounts:
+          - name: work
+            mountPath: /work
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+    containers:
+      # celld serves only after a deployment exists. Deploy a fetch-only
+      # placeholder once, into an empty fleet bucket, so a later pod
+      # restart never replaces the application deployed on top of it.
+      - name: bootstrap-deployment
+        image: {{ printf "%s:%s" $s.image.repository $s.image.tag }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            set -eu
+            if [ ! -f /work/needs-deployment ]; then
+              echo "s3://{{ $r.bucket }} already has a deployment"
+              exit 0
+            fi
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl ca-certificates xz-utils
+            cd /tmp
+            curl -fsSL https://esbuild.github.io/dl/v0.25.5 | sh
+            export PATH="/tmp:$PATH"
+            mkdir -p /tmp/worker
+            printf '%s\n' '{"name":"celld-placeholder","main":"index.js","compatibility_date":"2026-01-01"}' > /tmp/worker/wrangler.jsonc
+            printf '%s\n' 'export default { fetch() { return new Response("celld ok"); } };' > /tmp/worker/index.js
+            celld deploy /tmp/worker --bucket s3://{{ $r.bucket }}
+        envFrom:
+          - secretRef:
+              name: {{ $r.name }}
+        volumeMounts:
+          - name: work
+            mountPath: /work
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 512Mi
+{{- end }}
+
 {{- if $state.rustfs.enabled }}
 {{- $rustfs := $state.rustfs }}
 {{- $creds := $rustfs.credentialsSecretRef }}
@@ -126,8 +224,8 @@ spec:
 {{- /* Gate on sticky existence (revision > 0), not Ready: un-rendering would
      delete the Job when Ready flaps. The Job itself waits for RustFS to answer. */}}
 {{- if $state.observed.rustfsRelease.exists }}
-{{- /* A Job template is immutable: a new name per bucket set and celld image. */}}
-{{- $jobHash := printf "%s|%s|%s:%s" ($rustfs.buckets | join ",") $rustfs.bucket $state.image.repository $state.image.tag | sha256sum | trunc 8 }}
+{{- $jobSpec := include "celldstack.rustfsBucketJobSpec" (dict "state" $state "rustfs" $rustfs) | trim }}
+{{- $jobHash := $jobSpec | sha256sum | trunc 8 }}
 {{- $jobName := printf "%s-rustfs-buckets-%s" $state.name $jobHash }}
 ---
 apiVersion: kubernetes.m.crossplane.io/v1alpha1
@@ -151,97 +249,7 @@ spec:
         namespace: {{ $state.namespace }}
         labels: {{ $state.labels | toJson }}
       spec:
-        backoffLimit: 10
-        template:
-          metadata:
-            labels: {{ $state.labels | toJson }}
-          spec:
-            restartPolicy: OnFailure
-            volumes:
-              - name: work
-                emptyDir: {}
-            initContainers:
-              - name: create-buckets
-                # renovate: datasource=docker depName=amazon/aws-cli
-                image: amazon/aws-cli:2.31.13
-                command:
-                  - /bin/sh
-                  - -c
-                  - |
-                    set -eu
-                    i=0
-                    until aws --endpoint-url "$S3_ENDPOINT" s3api list-buckets >/dev/null; do
-                      i=$((i + 1))
-                      if [ "$i" -ge 60 ]; then echo "RustFS is not reachable" >&2; exit 1; fi
-                      sleep 2
-                    done
-                    for bucket in {{ $rustfs.buckets | join " " }}; do
-                      if aws --endpoint-url "$S3_ENDPOINT" s3api head-bucket --bucket "$bucket" 2>/dev/null; then
-                        echo "bucket $bucket exists"
-                      else
-                        aws --endpoint-url "$S3_ENDPOINT" s3api create-bucket --bucket "$bucket"
-                        echo "bucket $bucket created"
-                      fi
-                    done
-                    # Only a 404 means "no deployment yet". Any other error (auth,
-                    # network, 5xx) fails the Job so it retries, and never deploys
-                    # the placeholder over an application.
-                    if out=$(aws --endpoint-url "$S3_ENDPOINT" s3api head-object --bucket {{ $rustfs.bucket }} --key deploy/current.json 2>&1); then
-                      echo "s3://{{ $rustfs.bucket }}/deploy/current.json exists"
-                    elif printf '%s' "$out" | grep -q '(404)'; then
-                      touch /work/needs-deployment
-                    else
-                      printf '%s\n' "$out" >&2
-                      exit 1
-                    fi
-                envFrom:
-                  - secretRef:
-                      name: {{ $rustfs.name }}
-                volumeMounts:
-                  - name: work
-                    mountPath: /work
-                resources:
-                  requests:
-                    cpu: 10m
-                    memory: 64Mi
-                  limits:
-                    memory: 256Mi
-            containers:
-              # celld serves only after a deployment exists. Deploy a fetch-only
-              # placeholder once, into an empty fleet bucket, so a later pod
-              # restart never replaces the application deployed on top of it.
-              - name: bootstrap-deployment
-                image: {{ printf "%s:%s" $state.image.repository $state.image.tag }}
-                command:
-                  - /bin/sh
-                  - -c
-                  - |
-                    set -eu
-                    if [ ! -f /work/needs-deployment ]; then
-                      echo "s3://{{ $rustfs.bucket }} already has a deployment"
-                      exit 0
-                    fi
-                    apt-get update
-                    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl ca-certificates xz-utils
-                    cd /tmp
-                    curl -fsSL https://esbuild.github.io/dl/v0.25.5 | sh
-                    export PATH="/tmp:$PATH"
-                    mkdir -p /tmp/worker
-                    printf '%s\n' '{"name":"celld-placeholder","main":"index.js","compatibility_date":"2026-01-01"}' > /tmp/worker/wrangler.jsonc
-                    printf '%s\n' 'export default { fetch() { return new Response("celld ok"); } };' > /tmp/worker/index.js
-                    celld deploy /tmp/worker --bucket s3://{{ $rustfs.bucket }}
-                envFrom:
-                  - secretRef:
-                      name: {{ $rustfs.name }}
-                volumeMounts:
-                  - name: work
-                    mountPath: /work
-                resources:
-                  requests:
-                    cpu: 10m
-                    memory: 64Mi
-                  limits:
-                    memory: 512Mi
+        {{- $jobSpec | nindent 8 }}
   providerConfigRef:
     name: {{ $state.kubernetesProviderConfigRef.name }}
     kind: {{ $state.kubernetesProviderConfigRef.kind }}

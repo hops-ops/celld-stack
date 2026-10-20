@@ -480,7 +480,7 @@ _items = [
                     apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
                     kind = "Object"
                     metadata = {
-                        name = "celld-rustfs-buckets-ea80c0f0"
+                        name = "celld-rustfs-buckets-f68067af"
                         namespace = "default"
                         annotations = {"crossplane.io/composition-resource-name" = "rustfs-buckets-job"}
                     }
@@ -540,7 +540,7 @@ _items = [
                 {
                     apiVersion = "kubernetes.m.crossplane.io/v1alpha1"
                     kind = "Object"
-                    metadata.name = "celld-rustfs-buckets-ea80c0f0"
+                    metadata.name = "celld-rustfs-buckets-f68067af"
                 }
                 {
                     apiVersion = "helm.m.crossplane.io/v1beta1"

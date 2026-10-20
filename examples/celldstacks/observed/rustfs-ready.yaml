@@ -42,7 +42,7 @@ status:
 apiVersion: kubernetes.m.crossplane.io/v1alpha1
 kind: Object
 metadata:
-  name: celld-rustfs-buckets-ea80c0f0
+  name: celld-rustfs-buckets-f68067af
   namespace: default
   annotations:
     crossplane.io/composition-resource-name: rustfs-buckets-job
