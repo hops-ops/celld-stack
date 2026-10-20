@@ -123,6 +123,8 @@ spec:
     kind: {{ $state.helmProviderConfigRef.kind }}
 {{- end }}
 
+{{- /* Gate on sticky existence (revision > 0), not Ready: un-rendering would
+     delete the Job when Ready flaps. The Job itself waits for RustFS to answer. */}}
 {{- if $state.observed.rustfsRelease.exists }}
 {{- /* A Job template is immutable: a new name per bucket set and celld image. */}}
 {{- $jobHash := printf "%s|%s|%s:%s" ($rustfs.buckets | join ",") $rustfs.bucket $state.image.repository $state.image.tag | sha256sum | trunc 8 }}
@@ -181,8 +183,16 @@ spec:
                         echo "bucket $bucket created"
                       fi
                     done
-                    if ! aws --endpoint-url "$S3_ENDPOINT" s3api head-object --bucket {{ $rustfs.bucket }} --key deploy/current.json >/dev/null 2>&1; then
+                    # Only a 404 means "no deployment yet". Any other error (auth,
+                    # network, 5xx) fails the Job so it retries, and never deploys
+                    # the placeholder over an application.
+                    if out=$(aws --endpoint-url "$S3_ENDPOINT" s3api head-object --bucket {{ $rustfs.bucket }} --key deploy/current.json 2>&1); then
+                      echo "s3://{{ $rustfs.bucket }}/deploy/current.json exists"
+                    elif printf '%s' "$out" | grep -q '(404)'; then
                       touch /work/needs-deployment
+                    else
+                      printf '%s\n' "$out" >&2
+                      exit 1
                     fi
                 envFrom:
                   - secretRef:
