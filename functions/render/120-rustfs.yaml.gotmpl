@@ -1,0 +1,303 @@
+# code: language=yaml
+#
+# RustFS: in-cluster S3-compatible object storage (rustfs.enabled).
+#
+# Chart: https://charts.rustfs.com (chart name: rustfs)
+# Upstream: https://github.com/rustfs/rustfs
+#
+# 1. Copy the user's RUSTFS_ACCESS_KEY / RUSTFS_SECRET_KEY Secret into the
+#    release namespace, adding the AWS_* aliases and S3_ENDPOINT that celld
+#    and its bootstrap deploy init container read through envFrom.
+# 2. Install RustFS (standalone) with that Secret as its root credentials.
+# 3. Create the fleet bucket and any extra buckets with a one-shot Job, and
+#    deploy a placeholder Worker once if the fleet bucket has no deployment.
+
+{{- /* Bucket Job spec. Rendered once, hashed into the Job name (a Job's pod
+     template is immutable, so any change to it must create a new Job). */}}
+{{- define "celldstack.rustfsBucketJobSpec" }}
+{{- $s := .state }}
+{{- $r := .rustfs }}
+backoffLimit: 10
+template:
+  metadata:
+    labels: {{ $s.labels | toJson }}
+  spec:
+    restartPolicy: OnFailure
+    volumes:
+      - name: work
+        emptyDir: {}
+    initContainers:
+      - name: create-buckets
+        # renovate: datasource=docker depName=amazon/aws-cli
+        image: amazon/aws-cli:2.31.13
+        command:
+          - /bin/sh
+          - -c
+          - |
+            set -eu
+            i=0
+            until aws --endpoint-url "$S3_ENDPOINT" s3api list-buckets >/dev/null; do
+              i=$((i + 1))
+              if [ "$i" -ge 60 ]; then echo "RustFS is not reachable" >&2; exit 1; fi
+              sleep 2
+            done
+            for bucket in {{ $r.buckets | join " " }}; do
+              if aws --endpoint-url "$S3_ENDPOINT" s3api head-bucket --bucket "$bucket" 2>/dev/null; then
+                echo "bucket $bucket exists"
+              else
+                aws --endpoint-url "$S3_ENDPOINT" s3api create-bucket --bucket "$bucket"
+                echo "bucket $bucket created"
+              fi
+            done
+            # Only a 404 means "no deployment yet". Any other error (auth,
+            # network, 5xx) fails the Job so it retries, and never deploys
+            # the placeholder over an application.
+            if out=$(aws --endpoint-url "$S3_ENDPOINT" s3api head-object --bucket {{ $r.bucket }} --key deploy/current.json 2>&1); then
+              echo "s3://{{ $r.bucket }}/deploy/current.json exists"
+            elif printf '%s' "$out" | grep -q '(404)'; then
+              touch /work/needs-deployment
+            else
+              printf '%s\n' "$out" >&2
+              exit 1
+            fi
+        envFrom:
+          - secretRef:
+              name: {{ $r.name }}
+        volumeMounts:
+          - name: work
+            mountPath: /work
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+    containers:
+      # celld serves only after a deployment exists. Deploy a fetch-only
+      # placeholder once, into an empty fleet bucket, so a later pod
+      # restart never replaces the application deployed on top of it.
+      - name: bootstrap-deployment
+        image: {{ printf "%s:%s" $s.image.repository $s.image.tag }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            set -eu
+            if [ ! -f /work/needs-deployment ]; then
+              echo "s3://{{ $r.bucket }} already has a deployment"
+              exit 0
+            fi
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl ca-certificates xz-utils
+            cd /tmp
+            curl -fsSL https://esbuild.github.io/dl/v0.25.5 | sh
+            export PATH="/tmp:$PATH"
+            mkdir -p /tmp/worker
+            printf '%s\n' '{"name":"celld-placeholder","main":"index.js","compatibility_date":"2026-01-01"}' > /tmp/worker/wrangler.jsonc
+            printf '%s\n' 'export default { fetch() { return new Response("celld ok"); } };' > /tmp/worker/index.js
+            celld deploy /tmp/worker --bucket s3://{{ $r.bucket }}
+        envFrom:
+          - secretRef:
+              name: {{ $r.name }}
+        volumeMounts:
+          - name: work
+            mountPath: /work
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 512Mi
+{{- end }}
+
+{{- if $state.rustfs.enabled }}
+{{- $rustfs := $state.rustfs }}
+{{- $creds := $rustfs.credentialsSecretRef }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $state.name }}-rustfs-creds
+  annotations:
+    {{ setResourceNameAnnotation "rustfs-creds-secret" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    manifest:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: {{ $rustfs.name }}
+        namespace: {{ $state.namespace }}
+        labels: {{ $state.labels | toJson }}
+      type: Opaque
+      data:
+        S3_ENDPOINT: {{ $rustfs.endpoint | b64enc | quote }}
+        AWS_REGION: {{ $state.region | b64enc | quote }}
+  references:
+    - patchesFrom:
+        apiVersion: v1
+        kind: Secret
+        name: {{ $creds.name }}
+        namespace: {{ $creds.namespace }}
+        fieldPath: data.RUSTFS_ACCESS_KEY
+      toFieldPath: data.RUSTFS_ACCESS_KEY
+    - patchesFrom:
+        apiVersion: v1
+        kind: Secret
+        name: {{ $creds.name }}
+        namespace: {{ $creds.namespace }}
+        fieldPath: data.RUSTFS_SECRET_KEY
+      toFieldPath: data.RUSTFS_SECRET_KEY
+    - patchesFrom:
+        apiVersion: v1
+        kind: Secret
+        name: {{ $creds.name }}
+        namespace: {{ $creds.namespace }}
+        fieldPath: data.RUSTFS_ACCESS_KEY
+      toFieldPath: data.AWS_ACCESS_KEY_ID
+    - patchesFrom:
+        apiVersion: v1
+        kind: Secret
+        name: {{ $creds.name }}
+        namespace: {{ $creds.namespace }}
+        fieldPath: data.RUSTFS_SECRET_KEY
+      toFieldPath: data.AWS_SECRET_ACCESS_KEY
+    - dependsOn:
+        apiVersion: v1
+        kind: Namespace
+        name: {{ $state.namespace }}
+  providerConfigRef:
+    name: {{ $state.kubernetesProviderConfigRef.name }}
+    kind: {{ $state.kubernetesProviderConfigRef.kind }}
+
+{{- $rustfsDefaults := dict
+  "fullnameOverride" $rustfs.name
+  "commonLabels" $state.labels
+  "replicaCount" 1
+  "mode" (dict
+    "standalone" (dict "enabled" true)
+    "distributed" (dict "enabled" false)
+  )
+  "secret" (dict "existingSecret" $rustfs.name)
+  "config" (dict "rustfs" (dict "region" $state.region))
+  "ingress" (dict "enabled" false)
+  "storageclass" (dict
+    "name" $rustfs.persistence.storageClassName
+    "dataStorageSize" $rustfs.persistence.size
+    "logStorageSize" "256Mi"
+  )
+  "resources" (dict
+    "requests" (dict "cpu" "50m" "memory" "128Mi")
+    "limits" (dict "memory" "1Gi")
+  )
+}}
+
+{{- if ne $state.observed.rustfsCreds.id "" }}
+---
+apiVersion: helm.m.crossplane.io/v1beta1
+kind: Release
+metadata:
+  name: {{ $rustfs.name }}
+  annotations:
+    {{ setResourceNameAnnotation "helm-release-rustfs" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  forProvider:
+    chart:
+      name: rustfs
+      repository: https://charts.rustfs.com
+      # renovate: datasource=helm depName=rustfs registryUrl=https://charts.rustfs.com
+      version: "1.0.3"
+    namespace: {{ $state.namespace }}
+    wait: false
+    values:
+      {{- toYaml (mergeOverwrite $rustfsDefaults $rustfs.values) | nindent 6 }}
+  rollbackLimit: 3
+  providerConfigRef:
+    name: {{ $state.helmProviderConfigRef.name }}
+    kind: {{ $state.helmProviderConfigRef.kind }}
+{{- end }}
+
+{{- /* Gate on sticky existence (revision > 0), not Ready: un-rendering would
+     delete the Job when Ready flaps. The Job itself waits for RustFS to answer. */}}
+{{- if $state.observed.rustfsRelease.exists }}
+{{- $jobSpec := include "celldstack.rustfsBucketJobSpec" (dict "state" $state "rustfs" $rustfs) | trim }}
+{{- $jobHash := $jobSpec | sha256sum | trunc 8 }}
+{{- $jobName := printf "%s-rustfs-buckets-%s" $state.name $jobHash }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: {{ $jobName }}
+  annotations:
+    {{ setResourceNameAnnotation "rustfs-buckets-job" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  managementPolicies: {{ $state.managementPolicies | toJson }}
+  readiness:
+    policy: DeriveFromCelQuery
+    celQuery: "has(object.status.succeeded) && object.status.succeeded > 0"
+  forProvider:
+    manifest:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: {{ $jobName }}
+        namespace: {{ $state.namespace }}
+        labels: {{ $state.labels | toJson }}
+      spec:
+        {{- $jobSpec | nindent 8 }}
+  providerConfigRef:
+    name: {{ $state.kubernetesProviderConfigRef.name }}
+    kind: {{ $state.kubernetesProviderConfigRef.kind }}
+{{- end }}
+
+{{- if and $state.observed.namespace.ready $state.observed.rustfsRelease.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-helm-rustfs-before-namespace
+  annotations:
+    {{ setResourceNameAnnotation "usage-rustfs-namespace" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: kubernetes.m.crossplane.io/v1alpha1
+    kind: Object
+    resourceRef:
+      name: {{ $state.name }}-namespace
+  by:
+    apiVersion: helm.m.crossplane.io/v1beta1
+    kind: Release
+    resourceRef:
+      name: {{ $rustfs.name }}
+{{- end }}
+
+{{- if and $state.observed.rustfsCreds.ready $state.observed.rustfsRelease.ready }}
+---
+apiVersion: protection.crossplane.io/v1beta1
+kind: Usage
+metadata:
+  name: {{ $state.name }}-delete-helm-rustfs-before-rustfs-creds
+  annotations:
+    {{ setResourceNameAnnotation "usage-rustfs-creds" }}
+  labels: {{ $state.labels | toJson }}
+spec:
+  replayDeletion: true
+  of:
+    apiVersion: kubernetes.m.crossplane.io/v1alpha1
+    kind: Object
+    resourceRef:
+      name: {{ $state.name }}-rustfs-creds
+  by:
+    apiVersion: helm.m.crossplane.io/v1beta1
+    kind: Release
+    resourceRef:
+      name: {{ $rustfs.name }}
+{{- end }}
+{{- end }}

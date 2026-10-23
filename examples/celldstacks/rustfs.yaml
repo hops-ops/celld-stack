@@ -1,0 +1,13 @@
+apiVersion: hops.ops.com.ai/v1alpha1
+kind: CelldStack
+metadata:
+  name: celld
+  namespace: default
+spec:
+  clusterName: my-cluster
+  rustfs:
+    enabled: true
+    buckets:
+      - game-services
+    credentialsSecretRef:
+      name: celld-rustfs-credentials

@@ -35,7 +35,9 @@ jobs:
           { "example": "examples/celldstacks/standard.yaml" },
           { "example": "examples/celldstacks/azurite.yaml" },
           { "example": "examples/celldstacks/aws.yaml" },
-          { "example": "examples/celldstacks/aws-local.yaml" }
+          { "example": "examples/celldstacks/aws-local.yaml" },
+          { "example": "examples/celldstacks/rustfs.yaml" },
+          { "example": "examples/celldstacks/rustfs.yaml", "observed_resources": "examples/celldstacks/observed/rustfs-ready.yaml" }
         ]
       api_path: apis/celldstacks
       error_on_missing_schemas: true

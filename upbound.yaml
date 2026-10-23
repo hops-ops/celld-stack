@@ -37,6 +37,7 @@ spec:
     Composes:
     - Namespace for the release
     - celld Helm release (StatefulSet, public Service, internal headless Service)
+    - Optional in-cluster RustFS S3-compatible storage with buckets (local)
     - Optional in-cluster Azurite (local)
     - Optional AWS S3 bucket + EKS Pod Identity (aws.enabled)
   repository: ghcr.io/hops-ops/celld-stack

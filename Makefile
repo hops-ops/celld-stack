@@ -26,7 +26,9 @@ EXAMPLES := \
     examples/celldstacks/standard.yaml:: \
     examples/celldstacks/azurite.yaml:: \
     examples/celldstacks/aws.yaml:: \
-    examples/celldstacks/aws-local.yaml::
+    examples/celldstacks/aws-local.yaml:: \
+    examples/celldstacks/rustfs.yaml:: \
+    examples/celldstacks/rustfs.yaml::examples/celldstacks/observed/rustfs-ready.yaml
 
 render\:all:
 	@tmpdir=$$(mktemp -d); \
