@@ -42,7 +42,7 @@ _items = [
                             name = "celld"
                             repository = "https://hops-ops.github.io/celld-chart"
                             # renovate: datasource=github-releases depName=hops-ops/celld-chart
-                            version = "0.4.0"
+                            version = "0.5.1"
                         }
                         namespace = "celld"
                     }
