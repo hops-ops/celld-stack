@@ -526,7 +526,7 @@ _items = [
                         chart = {
                             name = "rustfs"
                             repository = "https://charts.rustfs.com"
-                            version = "1.0.3"
+                            version = "1.0.4"
                         }
                         namespace = "celld"
                         values = {
